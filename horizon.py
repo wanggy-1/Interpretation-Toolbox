@@ -296,7 +296,7 @@ if __name__ == '__main__':
     base_path = 'D:/Opendtect/Database/Niuzhuang/'
     horizon_file_path = 'Export'
     horizon_log_file_path = 'HorizonsLog'
-    output_file_path = 'E:/莫言工作组资料/多学科异构数据协同建模与有效储层预测/图片'
+    output_file_path = 'E:/科研项目/多学科异构数据整合与智能建模方法/图片'
     # Parameters.
     hl_keyword = '_dense'  # Horizon with log file keyword.
     h_keyword = '-features'  # Horizon with features file keyword.
