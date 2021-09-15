@@ -4,6 +4,72 @@ import os
 import sys
 
 
+def resample_log(df_log=None, delta=None, depth_col='depth', log_col=None, method='average'):
+    """
+    Re-sample well log by a certain depth interval.
+    :param df_log: (pandas.DataFrame) - Well log data frame which contains ['depth', 'log'] columns.
+    :param delta: (Float) - Depth interval.
+    :param depth_col: (String) - Default is 'depth'. Depth column name.
+    :param log_col: (String or list of strings) - Well log column name(s). E.g. 'gamma' or ['Vp', 'porosity'].
+    :param method: (String) - Default is 'average'. Re-sampling method.
+                   'nearest' - Take the nearest log value.
+                   'average' - Take the mean of log values in a depth window (length = delta)
+                               centered at the re-sampled depth point.
+                   'median' - Take the median of log values in a depth window (length = delta)
+                              centered at the re-sampled depth point.
+                   'rms' - Take the root-mean-square of log values in a depth window (length = delta)
+                           centered at the re-sampled depth point.
+                   'most_frequent' - Take the most frequent log values in a depth window (length = delta)
+                                     centered at the re-sampled depth point.
+    :return: df_out: (pandas.Dataframe) - Re-sampled well log data frame.
+    """
+    depth = df_log[depth_col].values  # Original depth array.
+    log = df_log[log_col].values  # Original log array.
+    new_depth = np.arange(start=np.amin(depth) // delta * delta,
+                          stop=np.amax(depth) // delta * delta + delta * 2,
+                          step=delta)  # New depth array.
+    if log.ndim > 1:
+        new_log = np.full([len(new_depth), log.shape[1]], fill_value=np.nan)  # Initiate new log array (fill with nan).
+    else:
+        new_log = np.full(len(new_depth), fill_value=np.nan)
+    for i in range(len(new_depth)):
+        # Choose the depth and log values that fit the condition.
+        if new_depth[i] == np.amin(new_depth):  # Start point of new depth.
+            condition = (depth > new_depth[i]) & (depth <= new_depth[i] + delta / 2)
+        elif new_depth[i] == np.amax(new_depth):  # End point of new depth.
+            condition = (depth > new_depth[i] - delta / 2) & (depth <= new_depth[i])
+        else:  # Inner points of new depth.
+            condition = (depth > new_depth[i] - delta / 2) & (depth <= new_depth[i] + delta / 2)
+        index = np.argwhere(condition)  # Find index in the window.
+        temp_log = log[index]  # Log in the window.
+        temp_depth = depth[index]  # Depth in the window.
+        # Re-sample log by different methods.
+        if method == 'nearest' and len(temp_log):  # Nearest neighbor.
+            ind_nn = np.argmin(np.abs(temp_depth - new_depth[i]))  # The nearest neighbor index.
+            new_log[i] = temp_log[ind_nn]
+        if method == 'average' and len(temp_log):  # Take average value.
+            new_log[i] = np.average(temp_log, axis=0)
+        if method == 'median' and len(temp_log):  # Take median value.
+            new_log[i] = np.median(temp_log, axis=0)
+        if method == 'rms' and len(temp_log):  # Root-mean-square value.
+            new_log[i] = np.sqrt(np.mean(temp_log ** 2, axis=0))
+        if method == 'most_frequent' and len(temp_log):  # Choose the most frequent log value (for nominal log only).
+            if temp_log.ndim > 1 and temp_log.shape[1] > 1:
+                for j in range(temp_log.shape[1]):
+                    values, counts = np.unique(temp_log[:, j], return_counts=True)
+                    ind_mf = np.argmax(counts)
+                    new_log[i, j] = values[ind_mf]
+            else:
+                values, counts = np.unique(temp_log, return_counts=True)
+                ind_mf = np.argmax(counts)
+                new_log[i] = values[ind_mf]
+    # Output result to new data-frame.
+    df_out = pd.DataFrame(data=np.c_[new_depth, new_log], columns=df_log.columns)
+    df_out.dropna(axis='index', how='any', inplace=True)
+    df_out.reset_index(drop=True, inplace=True)
+    return df_out
+
+
 def log_interp(df=None, step=0.125, log_col_name=None, log_col_name_output=None, depth_col_name='Depth',
                top_col_name=None, bot_col_name=None, nominal=True):
     """
