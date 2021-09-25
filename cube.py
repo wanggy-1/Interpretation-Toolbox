@@ -160,6 +160,10 @@ def FSDI(seismic_file, log_dir, output_file, vertical_well=True, abnormal_value=
     sys.stdout.write('\n')
     print(df_ctp)
     # FSDInterpolation.
+    if weight is None:
+        weight = np.ones(Nfile + 3)  # Equal weight of all features.
+    else:
+        weight = np.array(weight)  # Custom feature weight.
     # Scale.
     if scale:
         # MinMaxScalar.
@@ -218,7 +222,7 @@ def FSDI(seismic_file, log_dir, output_file, vertical_well=True, abnormal_value=
                     itp[:, 3:] = np.squeeze(seis_scalar.transform(itp[:, 3:].reshape(-1, 1)))
                 else:
                     itp[:, 3:] = seis_scalar.transform(itp[:, 3:])  # Scale interpolate points' seismic attributes.
-            dist_map = cdist(itp, ctp, metric='euclidean')  # Compute distance map.
+            dist_map = cdist(itp, ctp, metric='minkowski', w=weight, p=2)  # Compute distance map.
             # Get column index of minimum distance.
             min_idx = np.argmin(dist_map, axis=1)
             # Interpolate log values according to minimum distance.
