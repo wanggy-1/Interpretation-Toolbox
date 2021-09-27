@@ -9,8 +9,9 @@ from sklearn.preprocessing import MinMaxScaler
 from scipy.spatial.distance import cdist
 
 
-def FSDI(seismic_file, log_dir, output_file, vertical_well=True, abnormal_value=-999, method='average', scale=True,
-         log_name=None, depth_name=None, coord_name=None, seis_name=None, well_name=None, weight=None,
+def FSDI(seismic_file, log_dir, output_file,
+         vertical_well=True, abnormal_value=-999, method='average', scale=True, weight=None,
+         log_name=None, depth_name=None, coord_name=None, seis_name=None, well_name=None,
          well_location_file=None, well_name_loc=None, coord_name_loc=None):
     """
     Feature and distance based interpolation (FSDI) for cube.
@@ -32,6 +33,9 @@ def FSDI(seismic_file, log_dir, output_file, vertical_well=True, abnormal_value=
                                Options: 'nearest', 'average', 'median', 'rms', 'most_frequent'.
     :param scale: (Bool) - Default is True. Whether to scale coordinates and seismic attributes to 0 and 1 with
                            MinMaxScalar.
+    :param weight: (List of floats) - Default is that all features (including spatial coordinates) have equal weight.
+                                      Weight of spatial coordinates and features, e.g. [1, 1, 1, 2, 2] for
+                                      ['x', 'y', 'z', 'amplitude', 'vp'].
     :param log_name: (String or list of strings) - Well log name.
                      For single log, directly enter log name like 'porosity'.
                      For multiple logs, enter log names as list of strings, e.g. ['Litho_Code', 'porosity'].
@@ -112,7 +116,7 @@ def FSDI(seismic_file, log_dir, output_file, vertical_well=True, abnormal_value=
         df = resample_log(df, delta=dt, depth_col=depth_name, log_col=log_name, method=method)
         if vertical_well:
             # Extract well coordinates from well (only for vertical wells).
-            well_coord = df_loc.loc[df_loc[well_name_loc] == log_file[:-4], coord_name_loc].values
+            well_coord = df_loc.loc[df_loc[well_name_loc] == log_file[:-4], coord_name_loc].values  # 2d array.
             if (np.squeeze(well_coord)[0] > np.amax(x) or np.squeeze(well_coord)[0] < np.amin(x)) and \
                     (np.squeeze(well_coord)[1] > np.amax(y) or np.squeeze(well_coord)[1] < np.amin(y)):
                 continue  # Check if this well is in target area.
@@ -124,7 +128,7 @@ def FSDI(seismic_file, log_dir, output_file, vertical_well=True, abnormal_value=
             well_coord = np.ones(shape=[len(df), 2]) * well_coord
         else:  # For inclined well.
             for i in range(len(df)):
-                log_coord = df.loc[i, coord_name]
+                log_coord = df.loc[i, coord_name].values  # 1d array.
                 if (np.squeeze(log_coord)[0] > np.amax(x) or np.squeeze(log_coord)[0] < np.amin(x)) and \
                         (np.squeeze(log_coord)[1] > np.amax(y) or np.squeeze(log_coord)[1] < np.amin(y)):
                     continue  # Check if this log location is in target area.
@@ -135,9 +139,9 @@ def FSDI(seismic_file, log_dir, output_file, vertical_well=True, abnormal_value=
             # Add well coordinate to data frame.
             data = np.c_[well_coord, df.values]
             if isinstance(log_name, str):
-                df = pd.DataFrame(data=data, columns=coord_name + [depth_name, log_name])
+                df = pd.DataFrame(data=data, columns=coord_name + [depth_name, log_name], copy=True)
             if isinstance(log_name, list):
-                df = pd.DataFrame(data=data, columns=coord_name + [depth_name] + log_name)
+                df = pd.DataFrame(data=data, columns=coord_name + [depth_name] + log_name, copy=True)
         # Add seismic features at control points (well log) to data frame.
         seis_ctp = np.zeros(shape=[len(df), Nfile], dtype='float32')
         if vertical_well:  # Vertical well.
@@ -247,19 +251,26 @@ def FSDI(seismic_file, log_dir, output_file, vertical_well=True, abnormal_value=
 
 
 if __name__ == '__main__':
-    seismic_file = ['/nfs/opendtect-data/Niuzhuang/Export/seismic_east.sgy',
-                    '/nfs/opendtect-data/Niuzhuang/Export/vpvs_east.sgy',
-                    '/nfs/opendtect-data/Niuzhuang/Export/sp_east.sgy']
+    multi_file = False
+    if multi_file:
+        seismic_file = ['/nfs/opendtect-data/Niuzhuang/Export/seismic_east.sgy',
+                        '/nfs/opendtect-data/Niuzhuang/Export/vpvs_east.sgy',
+                        '/nfs/opendtect-data/Niuzhuang/Export/sp_east.sgy']
+    else:
+        seismic_file = '/nfs/opendtect-data/Niuzhuang/Export/seismic_east.sgy'
     log_dir = '/nfs/opendtect-data/Niuzhuang/Well logs/LithoCodeForPetrel-time'  # Well log directory.
     well_location_file = '/nfs/opendtect-data/Niuzhuang/Well logs/well_locations.prn'  # Well location file.
+    weight = [5, 5, 5, 1]
     log_name = 'Litho_Code'
     depth_name = 'TWT'
     coord_name = ['X', 'Y']
-    seis_name = ['SeisAmp', 'VpVs', 'SP']
+    # seis_name = ['SeisAmp', 'VpVs', 'SP']
+    seis_name = 'SeisAmp'
     well_name = 'WellName'
-    output_file = 'Litho_Code_2.txt'
+    output_file = '/nfs/opendtect-data/Niuzhuang/Litho_Code_8.txt'
     well_name_loc = 'well_name'
     coord_name_loc = ['well_X', 'well_Y']
-    result = FSDI(seismic_file=seismic_file, log_dir=log_dir, output_file=output_file, method='most_frequent',
-                  log_name=log_name, depth_name=depth_name, coord_name=coord_name, seis_name=seis_name, well_name=well_name,
-                  well_location_file=well_location_file, well_name_loc=well_name_loc, coord_name_loc=coord_name_loc)
+    result = FSDI(seismic_file=seismic_file, log_dir=log_dir, output_file=output_file, weight=weight,
+                  method='most_frequent', log_name=log_name, depth_name=depth_name, coord_name=coord_name,
+                  seis_name=seis_name, well_name=well_name,  well_location_file=well_location_file,
+                  well_name_loc=well_name_loc, coord_name_loc=coord_name_loc)
