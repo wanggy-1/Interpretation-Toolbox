@@ -44,6 +44,7 @@ dependencies:
     - pytz==2021.1
     - scikit-learn==0.24.2
     - scipy==1.7.0
+    - segyio==1.9.7
     - sklearn==0.0
     - threadpoolctl==2.2.0
 prefix: /data/2019/wgy/anaconda3/envs/itb
