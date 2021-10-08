@@ -14,7 +14,7 @@ def FSDI(seismic_file, log_dir, output_file,
          log_name=None, depth_name=None, coord_name=None, seis_name=None, well_name=None,
          well_location_file=None, well_name_loc=None, coord_name_loc=None):
     """
-    Feature and distance based interpolation (FSDI) for cube.
+    Feature and distance based interpolation (FSDI) for cubes.
     :param seismic_file: (Strings or list of strings) - Seismic attributes file name (segy or sgy format).
                          For single file, directly enter file name.
                          For multiple files, enter file names as list of strings, e.g. ['a.sgy', 'b.sgy'].
@@ -62,11 +62,10 @@ def FSDI(seismic_file, log_dir, output_file,
         Nfile = len(seismic_file)
     else:
         raise ValueError('Seismic file must be string or list of strings.')
-    # Initiate list to store multiple files.
-    seis = []
-    for n in range(Nfile):
-        with segyio.open(seismic_file[n]) as f:
-            print('Read seismic data from file: ', seismic_file[n])
+    seis = []  # Initiate list to store seismic data.
+    for file in seismic_file:
+        with segyio.open(file) as f:
+            print('Read seismic data from file: ', file)
             # Memory map file for faster reading (especially if file is big...)
             mapped = f.mmap()
             if mapped:
@@ -88,8 +87,10 @@ def FSDI(seismic_file, log_dir, output_file,
             y = np.zeros(shape=(f.tracecount, ), dtype='float32')
             for i in range(f.tracecount):
                 sys.stdout.write('\rExtracting trace coordinates: %.2f%%' % ((i+1) / f.tracecount * 100))
-                x[i] = f.header[i][73] * 1e-1  # Adjust coordinate according to actual condition.
-                y[i] = f.header[i][77] * 1e-1  # Adjust coordinate according to actual condition.
+                # x[i] = f.header[i][73] * 1e-1  # Adjust coordinate according to actual condition.
+                # y[i] = f.header[i][77] * 1e-1  # Adjust coordinate according to actual condition.
+                x[i] = f.header[i][73]
+                y[i] = f.header[i][77]
             sys.stdout.write('\n')
             # Re-shape the trace coordinates array to match the seismic data cube.
             x = x.reshape([len(f.ilines), len(f.xlines)], order='C')
