@@ -265,8 +265,10 @@ if __name__ == '__main__':
     log_name = 'Litho_Code'
     depth_name = 'TWT'
     coord_name = ['X', 'Y']
-    # seis_name = ['SeisAmp', 'VpVs', 'SP']
-    seis_name = 'SeisAmp'
+    if multi_file:
+        seis_name = ['SeisAmp', 'VpVs', 'SP']
+    else:
+        seis_name = 'SeisAmp'
     well_name = 'WellName'
     output_file = '/nfs/opendtect-data/Niuzhuang/Litho_Code_8.txt'
     well_name_loc = 'well_name'
