@@ -249,31 +249,3 @@ def FSDI(seismic_file, log_dir, output_file,
     t2 = time.perf_counter()
     print('Process time: %.2fs' % (t2 - t1))
     return cube_itp
-
-
-if __name__ == '__main__':
-    multi_file = False
-    if multi_file:
-        seismic_file = ['/nfs/opendtect-data/Niuzhuang/Export/seismic_east.sgy',
-                        '/nfs/opendtect-data/Niuzhuang/Export/vpvs_east.sgy',
-                        '/nfs/opendtect-data/Niuzhuang/Export/sp_east.sgy']
-    else:
-        seismic_file = '/nfs/opendtect-data/Niuzhuang/Export/seismic_east.sgy'
-    log_dir = '/nfs/opendtect-data/Niuzhuang/Well logs/LithoCodeForPetrel-time'  # Well log directory.
-    well_location_file = '/nfs/opendtect-data/Niuzhuang/Well logs/well_locations.prn'  # Well location file.
-    weight = [5, 5, 5, 1]
-    log_name = 'Litho_Code'
-    depth_name = 'TWT'
-    coord_name = ['X', 'Y']
-    if multi_file:
-        seis_name = ['SeisAmp', 'VpVs', 'SP']
-    else:
-        seis_name = 'SeisAmp'
-    well_name = 'WellName'
-    output_file = '/nfs/opendtect-data/Niuzhuang/Litho_Code_8.txt'
-    well_name_loc = 'well_name'
-    coord_name_loc = ['well_X', 'well_Y']
-    result = FSDI(seismic_file=seismic_file, log_dir=log_dir, output_file=output_file, weight=weight,
-                  method='most_frequent', log_name=log_name, depth_name=depth_name, coord_name=coord_name,
-                  seis_name=seis_name, well_name=well_name,  well_location_file=well_location_file,
-                  well_name_loc=well_name_loc, coord_name_loc=coord_name_loc)
