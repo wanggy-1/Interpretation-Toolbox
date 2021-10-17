@@ -1,2 +1,2 @@
-# This file is my draft.
-pass
+# This is my draft.
+print('Hello world.')
