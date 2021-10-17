@@ -1,13 +1,14 @@
 import pandas as pd
 import numpy as np
-import os
+import scipy.interpolate
 import sys
+import math
 
 
 def resample_log(df_log=None, delta=None, depth_col='depth', log_col=None, method='average', abnormal_value=None,
                  nominal=False):
     """
-    Re-sample well log by a certain depth interval.
+    Re-sample well log by a certain depth interval (Small sampling interval to large sampling interval).
     :param df_log: (pandas.DataFrame) - Well log data frame which contains ['depth', 'log'] columns.
     :param delta: (Float) - Depth interval.
     :param depth_col: (String) - Default is 'depth'. Depth column name.
@@ -34,7 +35,7 @@ def resample_log(df_log=None, delta=None, depth_col='depth', log_col=None, metho
         df_log.reset_index(drop=True, inplace=True)
     depth = df_log[depth_col].values  # Original depth array.
     log = df_log[log_col].values  # Original log array.
-    new_depth = np.arange(start=np.amin(depth) // delta * delta,
+    new_depth = np.arange(start=math.ceil(np.amin(depth) // delta * delta),
                           stop=np.amax(depth) // delta * delta + delta * 2,
                           step=delta)  # New depth array.
     if log.ndim > 1:
@@ -44,7 +45,7 @@ def resample_log(df_log=None, delta=None, depth_col='depth', log_col=None, metho
     for i in range(len(new_depth)):
         # Choose the depth and log values that fit the condition.
         if new_depth[i] == np.amin(new_depth):  # Start point of new depth.
-            condition = (depth > new_depth[i]) & (depth <= new_depth[i] + delta / 2)
+            condition = (depth >= new_depth[i]) & (depth <= new_depth[i] + delta / 2)
         elif new_depth[i] == np.amax(new_depth):  # End point of new depth.
             condition = (depth > new_depth[i] - delta / 2) & (depth <= new_depth[i])
         else:  # Inner points of new depth.
@@ -52,26 +53,27 @@ def resample_log(df_log=None, delta=None, depth_col='depth', log_col=None, metho
         index = np.argwhere(condition)  # Find index in the window.
         temp_log = log[index]  # Log in the window.
         temp_depth = depth[index]  # Depth in the window.
-        # Re-sample log by different methods.
-        if method == 'nearest' and len(temp_log):  # Nearest neighbor.
-            ind_nn = np.argmin(np.abs(temp_depth - new_depth[i]))  # The nearest neighbor index.
-            new_log[i] = temp_log[ind_nn]
-        if method == 'average' and len(temp_log):  # Take average value.
-            new_log[i] = np.average(temp_log, axis=0)
-        if method == 'median' and len(temp_log):  # Take median value.
-            new_log[i] = np.median(temp_log, axis=0)
-        if method == 'rms' and len(temp_log):  # Root-mean-square value.
-            new_log[i] = np.sqrt(np.mean(temp_log ** 2, axis=0))
-        if method == 'most_frequent' and len(temp_log):  # Choose the most frequent log value (for nominal log only).
-            if temp_log.ndim > 1 and temp_log.shape[1] > 1:
-                for j in range(temp_log.shape[1]):
-                    values, counts = np.unique(temp_log[:, j], return_counts=True)
+        if len(temp_log):  # If there are log values in the window.
+            # Re-sample log by different methods.
+            if method == 'nearest' and len(temp_log):  # Nearest neighbor.
+                ind_nn = np.argmin(np.abs(temp_depth - new_depth[i]))  # The nearest neighbor index.
+                new_log[i] = temp_log[ind_nn]
+            if method == 'average' and len(temp_log):  # Take average value.
+                new_log[i] = np.average(temp_log, axis=0)
+            if method == 'median' and len(temp_log):  # Take median value.
+                new_log[i] = np.median(temp_log, axis=0)
+            if method == 'rms' and len(temp_log):  # Root-mean-square value.
+                new_log[i] = np.sqrt(np.mean(temp_log ** 2, axis=0))
+            if method == 'most_frequent' and len(temp_log):  # Choose the most frequent log value (nominal log only).
+                if temp_log.ndim > 1 and temp_log.shape[1] > 1:
+                    for j in range(temp_log.shape[1]):
+                        values, counts = np.unique(temp_log[:, j], return_counts=True)
+                        ind_mf = np.argmax(counts)
+                        new_log[i, j] = values[ind_mf]
+                else:
+                    values, counts = np.unique(temp_log, return_counts=True)
                     ind_mf = np.argmax(counts)
-                    new_log[i, j] = values[ind_mf]
-            else:
-                values, counts = np.unique(temp_log, return_counts=True)
-                ind_mf = np.argmax(counts)
-                new_log[i] = values[ind_mf]
+                    new_log[i] = values[ind_mf]
     # Output result to new data-frame.
     df_out = pd.DataFrame(data=np.c_[new_depth, new_log], columns=df_log.columns)
     df_out.dropna(axis='index', how='any', inplace=True)
@@ -84,7 +86,7 @@ def resample_log(df_log=None, delta=None, depth_col='depth', log_col=None, metho
 
 
 def log_interp(df=None, step=0.125, log_col=None, depth_col='Depth',
-               top_col=None, bottom_col=None, nominal=True):
+               top_col=None, bottom_col=None, nominal=True, mode='segmented', method='slinear'):
     """
     Interpolate well log between top depth and bottom depth.
     :param df: (pandas.DataFrame) - Well log data frame which contains ['top depth', 'bottom depth', 'log'] column.
@@ -94,26 +96,50 @@ def log_interp(df=None, step=0.125, log_col=None, depth_col='Depth',
     :param top_col: (String) - Column name of the top boundary depth.
     :param bottom_col: (String) - Column name of the bottom boundary depth.
     :param nominal: (Bool) - Default is True. Whether the log value is nominal.
+    :param mode: (String) - Default is 'segmented'. When is 'segmented', interpolate segmented well log with top depth
+                 and bottom depth column. When is 'continuous', interpolate continuous well log with depth column.
+    :param method: (String) - Default is 'slinear'. Interpolation method when processing continuous well log values.
+                   Optional methods are: 'linear', 'nearest', 'nearest-up', 'zero', 'slinear', 'quadratic', 'cubic',
+                   'previous', and 'next'. 'zero', 'slinear', 'quadratic' and 'cubic' refer to a spline interpolation of
+                   zeroth, first, second or third order; 'previous' and 'next' simply return the previous or next value
+                   of the point; 'nearest-up' and 'nearest' differ when interpolating half-integers (e.g. 0.5, 1.5) in
+                   that 'nearest-up' rounds up and 'nearest' rounds down.
     :return df_out: (pandas.DataFrame) - Interpolated well log data frame.
     """
-    depth_min = df[top_col].min()  # Get minimum depth.
-    depth_max = df[bottom_col].max()  # Get maximum depth.
-    depth_array = np.arange(depth_min, depth_max + step, step, dtype=np.float32)  # Create depth column.
-    # Initiate well log column with NaN.
-    if isinstance(log_col, str):
-        log_array = np.full(len(depth_array), np.nan)
-    elif isinstance(log_col, list) and len(log_col) > 1:
-        log_array = np.full([len(depth_array), len(log_col)], np.nan)
+    if mode == 'segmented':
+        depth_min = df[top_col].min()  # Get minimum depth.
+        depth_min = math.ceil(depth_min)
+        depth_max = df[bottom_col].max()  # Get maximum depth.
+        depth_array = np.arange(depth_min, depth_max + step, step, dtype=np.float32)  # Create depth column.
+        # Initiate well log column with NaN.
+        if isinstance(log_col, str):
+            log_array = np.full(len(depth_array), np.nan)
+        elif isinstance(log_col, list) and len(log_col) > 1:
+            log_array = np.full([len(depth_array), len(log_col)], np.nan)
+        else:
+            raise ValueError('Log column name must either be string type for 1 column or list type for 2 or more '
+                             'columns.')
+        # Create new data frame.
+        df_out = pd.DataFrame({depth_col: depth_array})
+        df_out[log_col] = log_array
+        # Assign log values to new data frame.
+        for i in range(len(df)):
+            idx = (df_out.loc[:, depth_col] <= df.loc[i, bottom_col]) & \
+                    (df_out.loc[:, depth_col] >= df.loc[i, top_col])
+            df_out.loc[idx, log_col] = df.loc[i, log_col]
+    elif mode == 'continuous':
+        log_depth = df[depth_col].values  # Get well log depth array.
+        log_value = df[log_col].values  # Get well log value array.
+        depth_min = np.amin(log_depth)  # Get minimum well log value.
+        depth_max = np.amax(log_depth)  # Get maximum well log value.
+        log_depth[log_depth == depth_min] = round(depth_min)
+        new_depth = np.arange(start=depth_min, stop=depth_max, step=step)  # New depth array.
+        f = scipy.interpolate.interp1d(log_depth, log_value, axis=0, kind=method)  # Interpolator.
+        new_value = f(new_depth)  # Interpolated log value.
+        data = np.c_[new_depth, new_value]
+        df_out = pd.DataFrame(data, columns=df.columns)
     else:
-        raise ValueError('Log column name must either be string type for 1 column or list type for 2 or more columns.')
-    # Create new data frame.
-    df_out = pd.DataFrame({depth_col: depth_array})
-    df_out[log_col] = log_array
-    # Assign log values to new data frame.
-    for i in range(len(df)):
-        idx = (df_out.loc[:, depth_col] <= df.loc[i, bottom_col]) & \
-                (df_out.loc[:, depth_col] >= df.loc[i, top_col])
-        df_out.loc[idx, log_col] = df.loc[i, log_col]
+        raise ValueError("Mode can only be 'segmented' or 'continuous'.")
     # Delete rows with NaN.
     df_out.dropna(axis='index', how='any', inplace=True)
     df_out.reset_index(drop=True, inplace=True)
@@ -169,35 +195,3 @@ def time_log(df_dt=None, df_log=None, log_depth_col='Depth', dt_depth_col='Depth
     if nominal:
         df_out[log_col] = df_out[log_col].astype('int32')
     return df_out
-
-
-if __name__ == '__main__':
-    # Set directories and file names.
-    root_dir = 'D:/Opendtect/Database/Niuzhuang/'
-    log_dir = 'Well logs/LithoCodeForPetrel-interpolated'
-    dt_dir = 'Well logs TD (new)'
-    output_dir = 'Well logs/LithoCodeForPetrel-time'
-    # Depth-time file list.
-    dt_file_list = os.listdir(os.path.join(root_dir, dt_dir))
-    # Log file list.
-    log_file_list = os.listdir(os.path.join(root_dir, log_dir))
-    for dt_file in dt_file_list:
-        # Get well name from depth-time file.
-        well_name = dt_file[:-4]
-        print('Processing well %s' % well_name)
-        # Read depth-time file.
-        df_dt = pd.read_csv(os.path.join(root_dir + dt_dir, dt_file), delimiter='\t')
-        # Print control.
-        file_match = 0
-        for log_file in log_file_list:
-            # Find the corresponding well in log files.
-            if well_name in log_file:
-                file_match = 1
-                print('\tCorresponding log file: %s' % log_file)
-                # Read log file.
-                df_log = pd.read_csv(os.path.join(root_dir + log_dir, log_file), delimiter='\t')
-                df_out = time_log(df_dt, df_log, log_col='Litho_Code', nominal=True)
-                df_out.to_csv(os.path.join(root_dir + output_dir, dt_file[:-4] + '.txt'), sep='\t', index=False)
-                break
-        if file_match == 0:
-            print('\tNo corresponding log file.')
