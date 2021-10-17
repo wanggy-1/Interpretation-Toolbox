@@ -566,26 +566,3 @@ def FSDI_interhorizon(seis_file=None, seis_name=None,
     # Print process time.
     print('Process time: %.2fs' % (t2 - t1))
     return cube_itp
-
-
-# Main function.
-if __name__ == '__main__':
-    seis_file = '/nfs/opendtect-data/Niuzhuang/Export/seismic_east.sgy'
-    hor_file = ['/nfs/opendtect-data/Niuzhuang/Export/T4_east_dense.dat',
-                '/nfs/opendtect-data/Niuzhuang/Export/z1_east_dense.dat',
-                '/nfs/opendtect-data/Niuzhuang/Export/z2_east_dense.dat',
-                '/nfs/opendtect-data/Niuzhuang/Export/z3_east_dense.dat',
-                '/nfs/opendtect-data/Niuzhuang/Export/z4_east_dense.dat',
-                '/nfs/opendtect-data/Niuzhuang/Export/z5_east_dense.dat',
-                '/nfs/opendtect-data/Niuzhuang/Export/z6_east_dense.dat',
-                '/nfs/opendtect-data/Niuzhuang/Export/T6_east_dense.dat']
-    log_folder = '/nfs/opendtect-data/Niuzhuang/Well logs/LithoCodeForPetrel-time'
-    well_loc_file = '/nfs/opendtect-data/Niuzhuang/Well logs/well_locations.prn'
-    output_file = '/nfs/opendtect-data/Niuzhuang/Litho_Code_11.txt'
-    FSDI_interhorizon(seis_file=seis_file, seis_name='seis_amp',
-                      horizon_file=hor_file, horizon_col=['x', 'y', 'inline', 'xline', 't'],
-                      log_dir=log_folder, log_value_col='Litho_Code',
-                      well_loc_file=well_loc_file,
-                      dp=None, fill_value=-1, init_value=1e30,
-                      output_file=output_file,
-                      tight_frame=True)
