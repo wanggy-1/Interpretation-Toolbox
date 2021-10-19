@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 import scipy.interpolate
 import sys
 import math
@@ -195,3 +196,52 @@ def time_log(df_dt=None, df_log=None, log_depth_col='Depth', dt_depth_col='Depth
     if nominal:
         df_out[log_col] = df_out[log_col].astype('int32')
     return df_out
+
+
+def cross_plot2D(df=None, x=None, y=None, c=None, cmap='rainbow',
+                 xlabel=None, ylabel=None, title=None, colorbar=None,
+                 xlim=None, ylim=None, show=True):
+    plt.figure()
+    # Set style sheet to bmh.
+    plt.style.use('bmh')
+    # Set up the scatter plot.
+    plt.scatter(x=x, y=y, data=df, c=c, cmap=cmap)
+    plt.xlabel(xlabel, fontsize=14)
+    plt.ylabel(ylabel, fontsize=14)
+    if xlim is not None:
+        plt.xlim(xlim[0], xlim[1])
+    if ylim is not None:
+        plt.ylim(ylim[0], ylim[1])
+    plt.title(title, fontsize=16)
+    cbar = plt.colorbar()
+    cbar.set_label(colorbar, size=14)
+    if show:
+        plt.show()
+
+
+def crossplot3D(df=None, x=None, y=None, z=None, c=None, cmap='rainbow',
+                xlabel=None, ylabel=None, zlabel=None, title=None, colorbar=None,
+                xlim=None, ylim=None, zlim=None, show=True):
+    fig = plt.figure()
+    ax = plt.axes(projection='3d')
+    # Get values from data frame.
+    xs = df[x].values
+    ys = df[y].values
+    zs = df[z].values
+    cs = df[c].values
+    # Set up the scatter plot.
+    scat = ax.scatter3D(xs, ys, zs, c=cs, cmap=cmap)
+    ax.set_xlabel(xlabel, fontsize=14)
+    ax.set_ylabel(ylabel, fontsize=14)
+    ax.set_zlabel(zlabel, fontsize=14)
+    if xlim is not None:
+        ax.set_xlim(xlim[0], xlim[1])
+    if ylim is not None:
+        ax.set_ylim(ylim[0], ylim[1])
+    if zlim is not None:
+        ax.set_zlim(zlim[0], zlim[1])
+    plt.title(title, fontsize=16)
+    cbar = fig.colorbar(scat, ax=ax)
+    cbar.set_label(colorbar, size=16)
+    if show:
+        plt.show()
