@@ -2,12 +2,11 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.interpolate
-import sys
 import math
 
 
 def resample_log(df_log=None, delta=None, depth_col='depth', log_col=None, method='average', abnormal_value=None,
-                 nominal=False):
+                 nominal=False, delete_nan=True, fill_nan=None):
     """
     Re-sample well log by a certain depth interval (Small sampling interval to large sampling interval).
     :param df_log: (pandas.DataFrame) - Well log data frame which contains ['depth', 'log'] columns.
@@ -28,14 +27,17 @@ def resample_log(df_log=None, delta=None, depth_col='depth', log_col=None, metho
                                      row with abnormal value. If None, means no abnormal value in log column.
     :param nominal: (Bool) - Default is False. Whether the log value is nominal (e.g. [0, 1, 2, 0, 2]). If True, the log
                     value will be integer, else the log value will be float.
+    :param delete_nan: (Bool) - Default is True. Whether to delete rows with NaN value.
+    :param fill_nan: (Integer or float) - Default is not to fill NaN. Fill NaN with this value.
     :return: df_out: (pandas.Dataframe) - Re-sampled well log data frame.
     """
+    df_log_copy = df_log.copy()
     if abnormal_value is not None:
-        df_log.replace(abnormal_value, np.nan)
-        df_log.dropna(axis='index', how='any', inplace=True)
-        df_log.reset_index(drop=True, inplace=True)
-    depth = df_log[depth_col].values  # Original depth array.
-    log = df_log[log_col].values  # Original log array.
+        df_log_copy.replace(abnormal_value, np.nan)
+        df_log_copy.dropna(axis='index', how='any', inplace=True)
+        df_log_copy.reset_index(drop=True, inplace=True)
+    depth = df_log_copy[depth_col].values  # Original depth array.
+    log = df_log_copy[log_col].values  # Original log array.
     new_depth = np.arange(start=math.ceil(np.amin(depth) // delta * delta),
                           stop=np.amax(depth) // delta * delta + delta * 2,
                           step=delta)  # New depth array.
@@ -76,9 +78,14 @@ def resample_log(df_log=None, delta=None, depth_col='depth', log_col=None, metho
                     ind_mf = np.argmax(counts)
                     new_log[i] = values[ind_mf]
     # Output result to new data-frame.
-    df_out = pd.DataFrame(data=np.c_[new_depth, new_log], columns=df_log.columns)
-    df_out.dropna(axis='index', how='any', inplace=True)
-    df_out.reset_index(drop=True, inplace=True)
+    df_out = pd.DataFrame(data=np.c_[new_depth, new_log], columns=df_log_copy.columns)
+    if fill_nan:
+        # Fill NaN.
+        df_out.fillna(value=fill_nan, inplace=True)
+    if delete_nan:
+        # Delete rows with NaN.
+        df_out.dropna(axis='index', how='any', inplace=True)
+        df_out.reset_index(drop=True, inplace=True)
     # Change data type.
     df_out = df_out.astype('float32')
     if nominal:
@@ -87,7 +94,8 @@ def resample_log(df_log=None, delta=None, depth_col='depth', log_col=None, metho
 
 
 def log_interp(df=None, step=0.125, log_col=None, depth_col='Depth',
-               top_col=None, bottom_col=None, nominal=True, mode='segmented', method='slinear'):
+               top_col=None, bottom_col=None, nominal=True, mode='segmented', method='slinear',
+               delete_nan=False, fill_nan=None):
     """
     Interpolate well log between top depth and bottom depth.
     :param df: (pandas.DataFrame) - Well log data frame which contains ['top depth', 'bottom depth', 'log'] column.
@@ -105,6 +113,8 @@ def log_interp(df=None, step=0.125, log_col=None, depth_col='Depth',
                    zeroth, first, second or third order; 'previous' and 'next' simply return the previous or next value
                    of the point; 'nearest-up' and 'nearest' differ when interpolating half-integers (e.g. 0.5, 1.5) in
                    that 'nearest-up' rounds up and 'nearest' rounds down.
+    :param delete_nan: (Bool) - Default is True. Whether to delete rows with NaN.
+    :param fill_nan: (Integer or float) - Default is not to fill NaN. Fil NaN with this value.
     :return df_out: (pandas.DataFrame) - Interpolated well log data frame.
     """
     if mode == 'segmented':
@@ -141,9 +151,13 @@ def log_interp(df=None, step=0.125, log_col=None, depth_col='Depth',
         df_out = pd.DataFrame(data, columns=df.columns)
     else:
         raise ValueError("Mode can only be 'segmented' or 'continuous'.")
-    # Delete rows with NaN.
-    df_out.dropna(axis='index', how='any', inplace=True)
-    df_out.reset_index(drop=True, inplace=True)
+    if fill_nan is not None:
+        # Fill NaN.
+        df_out.fillna(value=fill_nan, inplace=True)
+    if delete_nan:
+        # Delete rows with NaN.
+        df_out.dropna(axis='index', how='any', inplace=True)
+        df_out.reset_index(drop=True, inplace=True)
     # Change data type.
     df_out = df_out.astype('float32')
     if nominal:
@@ -152,7 +166,7 @@ def log_interp(df=None, step=0.125, log_col=None, depth_col='Depth',
 
 
 def time_log(df_dt=None, df_log=None, log_depth_col='Depth', dt_depth_col='Depth',
-             time_col='TWT', log_col=None, fillna=-999, nominal=False):
+             time_col='TWT', log_col=None, fill_nan=None, delete_nan=False, nominal=False):
     """
     Match well logs with a detailed time-depth relation.
     :param df_dt: (pandas.DataFrame) - Depth-time relation data frame which contains ['Depth', 'Time'] columns.
@@ -161,46 +175,67 @@ def time_log(df_dt=None, df_log=None, log_depth_col='Depth', dt_depth_col='Depth
     :param dt_depth_col: (String) - Default is 'Depth'. Column name of depth in depth-time relation file.
     :param time_col: (String) - Default is 'TWT'. Column name of two-way time.
     :param log_col: (String or list of strings) - Column name(s) of well log.
-    :param fillna: (Float or integer) - Fill NaN with this number.
+    :param fill_nan: (Float or integer) - Default is not to fill NaN. Fill NaN with this number.
+    :param delete_nan: (Bool) - Default is False. Whether to delete rows with NaN.
     :param nominal: (Bool) - Default is False. Whether the log value is nominal.
-    :return: df_out: (pandas.DataFrame) - Time domain well log data frame.
+    :return: df_log_time: (pandas.DataFrame) - Time domain well log data frame.
     """
-    # Set flag to speed up search.
-    flag = 0
-    for i in range(len(df_dt)):
-        if df_dt.loc[i, dt_depth_col] < np.amin(df_log[log_depth_col].values):
-            continue
-        elif df_dt.loc[i, dt_depth_col] > np.amax(df_log[log_depth_col].values):
-            print('D-T relation depth range is out of well log depth range. Auto-break.')
-            print('Process finished.')
-            break
-        for j in range(flag, len(df_log) - 1, 1):
-            top_log_depth = df_log.loc[j, log_depth_col]
-            bottom_log_depth = df_log.loc[j + 1, log_depth_col]
-            if top_log_depth <= df_dt.loc[i, dt_depth_col] <= bottom_log_depth:
-                df_dt.loc[i, log_col] = df_log.loc[j, log_col]
-                flag = j
-                break
-        # Print progress.
-        sys.stdout.write('\rProgress: %.2f%% [%d/%d samples]' % ((i+1)/len(df_dt) * 100, i+1, len(df_dt)))
-    sys.stdout.write('\n')
+    df_log_time = df_log.copy()
+    if log_col == 'infer':
+        # Infer log columns.
+        log_col = list(df_log_time.columns).remove(log_depth_col)
+    # Remove rows in well log whose depth is out of range of depth-time relation.
+    ind = [i for i in range(len(df_log_time)) if df_log_time.loc[i, log_depth_col] < df_dt[dt_depth_col].min() or
+           df_log_time.loc[i, log_depth_col] > df_dt[dt_depth_col].max()]
+    df_log_time.drop(ind, inplace=True)
+    df_log_time.reset_index(drop=True, inplace=True)
+    # Get depth and time arrays in df_dt.
+    depth = df_dt[dt_depth_col].values
+    time = df_dt[time_col].values
+    # Fit interpolator.
+    f = scipy.interpolate.interp1d(depth, time)
+    # Transform depth-domain well log to time-domain.
+    df_log_time[time_col] = f(df_log_time[log_depth_col].values)
+    # Drop depth column.
+    df_log_time.drop(columns=log_depth_col, inplace=True)
+    # Re-arrange columns in df_log_copy.
     if isinstance(log_col, str):
-        df_out = df_dt[[time_col, log_col]].copy()
-    elif isinstance(log_col, list) and len(log_col) > 1:
-        df_out = df_dt[[time_col] + log_col].copy()
-    else:
-        raise ValueError('Log column name must either be string type for 1 column or list type for 2 or more columns.')
-    df_out.fillna(fillna, inplace=True)
+        log_col = [log_col]
+    new_col = [time_col] + log_col
+    df_log_time = df_log_time[new_col]
+    if fill_nan is not None:
+        # Fill NaN.
+        df_log_time.fillna(value=fill_nan, inplace=True)
+    if delete_nan:
+        # Delete rows with NaN.
+        df_log_time.dropna(axis='index', how='any', inplace=True)
+        df_log_time.reset_index(drop=True, inplace=True)
     # Change data type.
-    df_out = df_out.astype('float32')
+    df_log_time = df_log_time.astype('float32')
     if nominal:
-        df_out[log_col] = df_out[log_col].astype('int32')
-    return df_out
+        df_log_time[log_col] = df_log_time[log_col].astype('int32')
+    return df_log_time
 
 
 def cross_plot2D(df=None, x=None, y=None, c=None, cmap='rainbow',
                  xlabel=None, ylabel=None, title=None, colorbar=None,
                  xlim=None, ylim=None, show=True):
+    """
+    Make 2D cross-plot.
+    https://towardsdatascience.com/scatterplot-creation-and-visualisation-with-matplotlib-in-python-7bca2a4fa7cf
+    :param df: (pandas.DataFrame) - Well log data frame.
+    :param x: (String) - Log name in data frame, which will be the x-axis of the cross-plot.
+    :param y: (String) - Log name in data frame, which will be the y-axis of the cross-plot.
+    :param c: (String) - Log name in data frame, which will be the color of the scatters in cross-plot.
+    :param cmap: (String) - Default is 'rainbow', the color map of scatters.
+    :param xlabel: (String) - X-axis name.
+    :param ylabel: (String) - Y-axis name.
+    :param title: (String) - Title of the figure.
+    :param colorbar: (String) - Name of the color-bar.
+    :param xlim: (List of floats) - Default is to infer from data. Range of x-axis, e.g. [0, 150]
+    :param ylim: (List of floats) - Default is to infer from data. Range of y-axis, e.g. [0, 150]
+    :param show: (Bool) - Default is True. Whether to show the figure.
+    """
     plt.figure()
     # Set style sheet to bmh.
     plt.style.use('bmh')
@@ -222,6 +257,24 @@ def cross_plot2D(df=None, x=None, y=None, c=None, cmap='rainbow',
 def crossplot3D(df=None, x=None, y=None, z=None, c=None, cmap='rainbow',
                 xlabel=None, ylabel=None, zlabel=None, title=None, colorbar=None,
                 xlim=None, ylim=None, zlim=None, show=True):
+    """
+    Make 3D cross-plot.
+    :param df: (pandas.DataFrame) - Well log data frame.
+    :param x: (String) - Log name in data frame, which will be the x-axis of the cross-plot.
+    :param y: (String) - Log name in data frame, which will be the y-axis of the cross-plot.
+    :param z: (String) - Log name in data frame, which will be the z-axis of the cross-plot.
+    :param c: (String) - Log name in data frame, which will be the color of the scatters in cross-plot.
+    :param cmap: (String) - Default is 'rainbow', the color map of scatters.
+    :param xlabel: (String) - X-axis name.
+    :param ylabel: (String) - Y-axis name.
+    :param zlabel: (String) - Z-axis name.
+    :param title: (String) - Title of the figure.
+    :param colorbar: (String) - Name of the color-bar.
+    :param xlim: (List of floats) - Default is to infer from data. Range of x-axis, e.g. [0, 150]
+    :param ylim: (List of floats) - Default is to infer from data. Range of y-axis, e.g. [0, 150]
+    :param zlim: (List of floats) - Default is to infer from data. Range of z-axis, e.g. [0, 150]
+    :param show: (Bool) - Default is True. Whether to show the figure.
+    """
     fig = plt.figure()
     ax = plt.axes(projection='3d')
     # Get values from data frame.
@@ -243,5 +296,55 @@ def crossplot3D(df=None, x=None, y=None, z=None, c=None, cmap='rainbow',
     plt.title(title, fontsize=16)
     cbar = fig.colorbar(scat, ax=ax)
     cbar.set_label(colorbar, size=16)
+    if show:
+        plt.show()
+
+
+def plotlog(df=None, depth=None, log=None, cmap='rainbow',
+            xlabel=None, ylabel='Depth - m', xlim=None, ylim=None,
+            title=None, show=True):
+    """
+    Draw well log curves.
+    https://towardsdatascience.com/enhancing-visualization-of-well-logs-with-plot-fills-72d9dcd10c1b
+    :param df: (pandas.DataFrame) - Well log data frame.
+    :param depth: (String) - Depth column name in data frame.
+    :param log: (String) - Log column name in data frame.
+    :param cmap: (String) - Default is 'rainbow'. Color map to fill the area under the log curve.
+    :param xlabel: (String) - X-axis name.
+    :param ylabel: (String) - Default is 'Depth - m'. Y-axis name.
+    :param xlim: (List of floats) - Default is to infer from data. Range of x-axis, e.g. [0, 150].
+    :param ylim: (List of floats) - Default is to infer from data. Range of y-axis, e.g. [0, 2000].
+    :param title: (String) - Title of the figure.
+    :param show: (Bool) - Default is True. Whether to show the figure.
+    """
+    # Set up the plot.
+    plt.style.use('bmh')  # PLot style.
+    plt.figure(figsize=(7, 10))
+    ax = plt.axes()
+    plt.plot(log, depth, data=df, c='black', lw=0.5)
+    if xlim is not None:
+        ax.set_xlim(xlim[0], xlim[1])
+    if ylim is None:
+        ax.set_ylim(df[depth].min(), df[depth].max())
+    else:
+        ax.set_ylim(ylim[0], ylim[1])
+    ax.invert_yaxis()
+    ax.set_xlabel(xlabel, fontsize=14)
+    ax.set_ylabel(ylabel, fontsize=14)
+    ax.set_title(title, fontsize=16, fontweight='bold')
+    # Get x axis range.
+    left_value, right_value = ax.get_xlim()
+    span = abs(left_value - right_value)
+    # Get log value.
+    curve = df[log]
+    # Assign color map.
+    cmap = plt.get_cmap(cmap)
+    # Create array of values to divide up the area under curve.
+    color_index = np.arange(left_value, right_value, span / 100)
+    # Loop through each value in the color_index.
+    for index in sorted(color_index):
+        index_value = (index - left_value) / span
+        color = cmap(index_value)  # Obtain color for color index value.
+        plt.fill_betweenx(df[depth], 0, curve, where=curve >= index, color=color)
     if show:
         plt.show()
