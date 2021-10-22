@@ -27,7 +27,7 @@ def FSDI(seismic_file, log_dir, output_file,
                           If True, will process wells as vertical wells, the well log files must have two columns:
                           depth (depth_name) and log (log_name).
                           If False, will process wells as inclined wells, the well log files must
-                          have four columns: x (coord_name[0]), y (coord_name[1]), depth (depth_name) and log (log_name).
+                          have 4 columns: x (coord_name[0]), y (coord_name[1]), depth (depth_name) and log (log_name).
     :param abnormal_value: (Float) - Default is -999. The abnormal value in log column.
     :param method: (Strings) - Default is 'average'. Well log re-sampling method.
                                Options: 'nearest', 'average', 'median', 'rms', 'most_frequent'.
