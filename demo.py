@@ -42,9 +42,9 @@ log_col_name = 'Litho_Code'  # Well log column name in df_log.
 fill_nan = -999  # There may be NaN after conversion. Fill it with this value (-999).
 nominal = True  # Lithology well log data are nominal data.
 df_tlog = time_log(df_dt=df_dt, df_log=df_log, time_col=time_col_name, log_depth_col=depth_col_name,
-                   dt_depth_col=depth_col_name, log_col=log_col_name, fillna=fill_nan, nominal=nominal)
+                   dt_depth_col=depth_col_name, log_col=log_col_name, fill_nan=fill_nan, nominal=nominal)
 # Print time-domain well log data frame.
-print('Time domain well log data frame (5000~5099 rows):\n', df_tlog[5000:5100])
+print('Time domain well log data frame:\n', df_tlog)
 
 
 ##
@@ -70,9 +70,9 @@ log_col_name = ['POR', 'PERM', 'SW']  # Well log column name in df_log.
 fill_nan = -999  # There may be NaN after conversion. Fill it with this value (-999).
 nominal = False  # Porosity, permeability and water-saturation data are numeric data.
 df_tlog = time_log(df_dt=df_dt, df_log=df_log, time_col=time_col_name, log_depth_col=log_depth_col_name,
-                   dt_depth_col=dt_depth_col_name, log_col=log_col_name, fillna=fill_nan, nominal=nominal)
+                   dt_depth_col=dt_depth_col_name, log_col=log_col_name, fill_nan=fill_nan, nominal=nominal)
 # Print time-domain well log data frame.
-print('Time domain well log data frame (5000~5099 rows):\n', df_tlog[5000:5100])
+print('Time domain well log data frame:\n', df_tlog)
 
 
 ##
@@ -121,6 +121,7 @@ print('Re-sampled well log data frame (210~299 rows):\n', df_log_res[210:300])
 
 ##
 from horizon import *
+from matplotlib.colors import LinearSegmentedColormap
 # This is a demonstration of using FSDI to interpolate lithology on horizons.
 # Print-screen format.
 pd.options.display.max_rows = 100

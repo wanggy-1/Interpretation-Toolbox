@@ -1,7 +1,6 @@
 import os
 import sys
 import time
-
 import segyio
 import matplotlib.pyplot as plt
 import numpy as np
@@ -9,7 +8,6 @@ import pandas as pd
 import scipy.spatial.distance
 from scipy import interpolate
 from sklearn import preprocessing
-from matplotlib.colors import LinearSegmentedColormap
 
 
 def horizon_interp(df=None, x_step=25.0, y_step=25.0, method='linear', visualize=True,

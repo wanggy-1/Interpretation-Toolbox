@@ -34,11 +34,13 @@ dependencies:
   - zlib=1.2.11=h7b6447c_3
   - pip:
     - cycler==0.10.0
+    - greenlet==1.1.2
     - joblib==1.0.1
     - kiwisolver==1.3.1
     - matplotlib==3.4.2
     - pandas==1.3.0
     - pillow==8.3.1
+    - pymysql==1.0.2
     - pyparsing==2.4.7
     - python-dateutil==2.8.2
     - pytz==2021.1
@@ -46,5 +48,6 @@ dependencies:
     - scipy==1.7.0
     - segyio==1.9.7
     - sklearn==0.0
+    - sqlalchemy==1.4.25
     - threadpoolctl==2.2.0
-prefix: /data/2019/wgy/anaconda3/envs/itb
+prefix: /home/wangguangyu/anaconda3/envs/itb
