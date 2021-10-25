@@ -1,3 +1,3 @@
 # Interpretation-Toolbox
 A toolbox for seismic interpretation.\
-I will add a proper readme ASAP :)
+I will write a proper readme ASAP :)
