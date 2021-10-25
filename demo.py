@@ -1,5 +1,7 @@
 ##
 # Demonstration of interpolating segmented well log data.
+import pandas as pd
+
 from well_log import *
 # The segmented well log file name.
 log_file = '/nfs/opendtect-data/Niuzhuang/Well logs/LithoCodeForPetrel/DK1.txt'
@@ -117,6 +119,71 @@ df_log_res = resample_log(df_log=df_log, delta=sampling_interval, depth_col=dept
                           method=resample_method, abnormal_value=abnormal_value, nominal=nominal)
 # Print re-sampled well log data frame.
 print('Re-sampled well log data frame (210~299 rows):\n', df_log_res[210:300])
+
+
+##
+# Demonstration of making 2D cross-plot with well logging data.
+from well_log import *
+# Load well logging data.
+file = '/nfs/opendtect-data/Niuzhuang/Well logs/W584.csv'
+df = pd.read_csv(file)
+# Choose well logs as x and y coordinates of scatters.
+x = 'AC'  # The column name in df.
+y = 'DEN'  # The column name in df.
+# Choose well log as colors of scatters.
+c = 'GR'  # The column name in df.
+# Choose a colormap.
+cmap = 'rainbow'
+# Define x and y axis name.
+x_name = 'Acoustic Compressional - us/m'
+y_name = 'Bulk Density - g/cm3'
+# Define color bar name.
+cb_name = 'Gamma Ray - API'
+# Make cross-plot.
+cross_plot2D(df=df, x=x, y=y, c=c, cmap=cmap, xlabel=x_name, ylabel=y_name, title='W584', colorbar=cb_name)
+
+
+##
+# Demonstration of making 3D cross-plot of well logging data.
+from well_log import *
+# Load well logging data.
+file = '/nfs/opendtect-data/Niuzhuang/Well logs/W584.csv'
+df = pd.read_csv(file)
+# Choose well logs as x, y and z coordinates of scatters.
+x = 'AC'  # The column name in df.
+y = 'DEN'  # The column name in df.
+z = 'SP'  # The column name in df.
+# Choose well log as colors of scatters.
+c = 'GR'  # The column name in df.
+# Choose a color map.
+cmap = 'rainbow'
+# Define x, y and z axis names.
+x_name = 'Acoustic Compressional - us/m'
+y_name = 'Bulk Density - g/cm3'
+z_name = 'Spontaneous Potential - mV'
+# Define color bar name.
+cb_name = 'Gamma Ray - API'
+cross_plot3D(df=df, x=x, y=y, z=z, c=c, cmap=cmap, xlabel=x_name, ylabel=y_name, zlabel=z_name, colorbar=cb_name,
+             title='W584')
+
+
+##
+# Demonstration of visualizing well log.
+from well_log import *
+# Load well logging data.
+file = '/nfs/opendtect-data/Niuzhuang/Well logs/W584.csv'
+df = pd.read_csv(file)
+# Depth column name.
+depth = 'DEPTH'
+# Log column name.
+log = 'POR'
+# Choose a color map.
+cmap = 'rainbow'
+# Set depth range to visualize.
+ylim = [2400, 2600]
+# Define x axis name.
+x_name = 'Porosity - %'
+plotlog(df, depth=depth, log=log, cmap=cmap, ylim=ylim, xlabel='Porosity - %', title='W584', fill_log=True)
 
 
 ##
