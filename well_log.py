@@ -46,7 +46,7 @@ def resample_log(df_log=None, delta=None, depth_col='depth', log_col=None, metho
     else:
         new_log = np.full(len(new_depth), fill_value=np.nan)
     for i in range(len(new_depth)):
-        # Choose the depth and log values that fit the condition.
+        # Choose the depth and log values that meet the condition.
         if new_depth[i] == np.amin(new_depth):  # Start point of new depth.
             condition = (depth >= new_depth[i]) & (depth <= new_depth[i] + delta / 2)
         elif new_depth[i] == np.amax(new_depth):  # End point of new depth.
@@ -79,11 +79,16 @@ def resample_log(df_log=None, delta=None, depth_col='depth', log_col=None, metho
                     new_log[i] = values[ind_mf]
     # Output result to new data-frame.
     df_out = pd.DataFrame(data=np.c_[new_depth, new_log], columns=df_log_copy.columns)
+    # Remove rows with all missing log values (NaN).
+    sub_col = list(df_out.columns)
+    sub_col.remove(depth_col)
+    df_out.dropna(axis='index', how='all', subset=sub_col, inplace=True)
+    df_out.reset_index(drop=True, inplace=True)
     if fill_nan:
         # Fill NaN.
         df_out.fillna(value=fill_nan, inplace=True)
     if delete_nan:
-        # Delete rows with NaN.
+        # Delete rows with any NaN.
         df_out.dropna(axis='index', how='any', inplace=True)
         df_out.reset_index(drop=True, inplace=True)
     # Change data type.
@@ -151,6 +156,11 @@ def log_interp(df=None, step=0.125, log_col=None, depth_col='Depth',
         df_out = pd.DataFrame(data, columns=df.columns)
     else:
         raise ValueError("Mode can only be 'segmented' or 'continuous'.")
+    # Remove rows with all missing log values (NaN).
+    sub_col = list(df_out.columns)
+    sub_col.remove(depth_col)
+    df_out.dropna(axis='index', how='all', subset=sub_col, inplace=True)
+    df_out.reset_index(drop=True, inplace=True)
     if fill_nan is not None:
         # Fill NaN.
         df_out.fillna(value=fill_nan, inplace=True)
@@ -203,6 +213,11 @@ def time_log(df_dt=None, df_log=None, log_depth_col='Depth', dt_depth_col='Depth
         log_col = [log_col]
     new_col = [time_col] + log_col
     df_log_time = df_log_time[new_col]
+    # Remove rows with all missing log values (NaN).
+    sub_col = list(df_log_time.columns)
+    sub_col.remove(time_col)
+    df_log_time.dropna(axis='index', how='all', subset=sub_col, inplace=True)
+    df_log_time.reset_index(drop=True, inplace=True)
     if fill_nan is not None:
         # Fill NaN.
         df_log_time.fillna(value=fill_nan, inplace=True)
@@ -254,9 +269,9 @@ def cross_plot2D(df=None, x=None, y=None, c=None, cmap='rainbow',
         plt.show()
 
 
-def crossplot3D(df=None, x=None, y=None, z=None, c=None, cmap='rainbow',
-                xlabel=None, ylabel=None, zlabel=None, title=None, colorbar=None,
-                xlim=None, ylim=None, zlim=None, show=True):
+def cross_plot3D(df=None, x=None, y=None, z=None, c=None, cmap='rainbow',
+                 xlabel=None, ylabel=None, zlabel=None, title=None, colorbar=None,
+                 xlim=None, ylim=None, zlim=None, show=True):
     """
     Make 3D cross-plot.
     :param df: (pandas.DataFrame) - Well log data frame.
@@ -300,7 +315,7 @@ def crossplot3D(df=None, x=None, y=None, z=None, c=None, cmap='rainbow',
         plt.show()
 
 
-def plotlog(df=None, depth=None, log=None, cmap='rainbow',
+def plotlog(df=None, depth=None, log=None, fill_log=True, cmap='rainbow',
             xlabel=None, ylabel='Depth - m', xlim=None, ylim=None,
             title=None, show=True):
     """
@@ -309,6 +324,7 @@ def plotlog(df=None, depth=None, log=None, cmap='rainbow',
     :param df: (pandas.DataFrame) - Well log data frame.
     :param depth: (String) - Depth column name in data frame.
     :param log: (String) - Log column name in data frame.
+    :param fill_log: (Bool) - Default is True which is to fill the area under the log curve.
     :param cmap: (String) - Default is 'rainbow'. Color map to fill the area under the log curve.
     :param xlabel: (String) - X-axis name.
     :param ylabel: (String) - Default is 'Depth - m'. Y-axis name.
@@ -332,19 +348,20 @@ def plotlog(df=None, depth=None, log=None, cmap='rainbow',
     ax.set_xlabel(xlabel, fontsize=14)
     ax.set_ylabel(ylabel, fontsize=14)
     ax.set_title(title, fontsize=16, fontweight='bold')
-    # Get x axis range.
-    left_value, right_value = ax.get_xlim()
-    span = abs(left_value - right_value)
-    # Get log value.
-    curve = df[log]
-    # Assign color map.
-    cmap = plt.get_cmap(cmap)
-    # Create array of values to divide up the area under curve.
-    color_index = np.arange(left_value, right_value, span / 100)
-    # Loop through each value in the color_index.
-    for index in sorted(color_index):
-        index_value = (index - left_value) / span
-        color = cmap(index_value)  # Obtain color for color index value.
-        plt.fill_betweenx(df[depth], 0, curve, where=curve >= index, color=color)
+    if fill_log:
+        # Get x axis range.
+        left_value, right_value = ax.get_xlim()
+        span = abs(left_value - right_value)
+        # Get log value.
+        curve = df[log]
+        # Assign color map.
+        cmap = plt.get_cmap(cmap)
+        # Create array of values to divide up the area under curve.
+        color_index = np.arange(left_value, right_value, span / 100)
+        # Loop through each value in the color_index.
+        for index in sorted(color_index):
+            index_value = (index - left_value) / span
+            color = cmap(index_value)  # Obtain color for color index value.
+            plt.fill_betweenx(df[depth], 0, curve, where=curve >= index, color=color)
     if show:
         plt.show()
