@@ -47,12 +47,7 @@ def resample_log(df_log=None, delta=None, depth_col='depth', log_col=None, metho
         new_log = np.full(len(new_depth), fill_value=np.nan)
     for i in range(len(new_depth)):
         # Choose the depth and log values that meet the condition.
-        if new_depth[i] == np.amin(new_depth):  # Start point of new depth.
-            condition = (depth >= new_depth[i]) & (depth <= new_depth[i] + delta / 2)
-        elif new_depth[i] == np.amax(new_depth):  # End point of new depth.
-            condition = (depth > new_depth[i] - delta / 2) & (depth <= new_depth[i])
-        else:  # Inner points of new depth.
-            condition = (depth > new_depth[i] - delta / 2) & (depth <= new_depth[i] + delta / 2)
+        condition = (depth > new_depth[i] - delta / 2) & (depth <= new_depth[i] + delta / 2)
         index = np.argwhere(condition)  # Find index in the window.
         temp_log = log[index]  # Log in the window.
         temp_depth = depth[index]  # Depth in the window.
