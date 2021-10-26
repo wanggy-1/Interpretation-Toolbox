@@ -86,8 +86,7 @@ def horizon_interp(df=None, x_step=25.0, y_step=25.0, method='linear', visualize
 
 
 def visualize_horizon(df=None, x_name='x', y_name='y', value_name=None, deltax=25.0, deltay=25.0, cmap='seismic_r',
-                      vmin=None, vmax=None, nominal=False, class_code=None, class_label=None, fig_name=None, show=True,
-                      save_fig=False, save_path=None, save_file=None):
+                      vmin=None, vmax=None, nominal=False, class_code=None, class_label=None, fig_name=None, show=True):
     """
     Visualize horizon data.
     :param df: (pandas.DataFrame) - Horizon data frame which contains ['x', 'y', 'value1', 'value2', '...'] columns.
@@ -104,9 +103,6 @@ def visualize_horizon(df=None, x_name='x', y_name='y', value_name=None, deltax=2
     :param class_label: (List of strings) - The class labels. (e.g. ['Mudstone', 'Shale', 'Sandstone']).
     :param fig_name: (String) - Default is 'Result'. Figure name.
     :param show: (Bool) - Default is True. Whether to show plot.
-    :param save_fig: (Bool) - Default is False. Whether to save the figure.
-    :param save_path: (String) - File directory to save the figure.
-    :param save_file: (String) - File name to save the figure.
     """
     # Construct regular grid to show horizon.
     x = df[x_name].values
@@ -145,10 +141,6 @@ def visualize_horizon(df=None, x_name='x', y_name='y', value_name=None, deltax=2
         cbar.ax.tick_params(axis='y', labelsize=16)
     else:
         plt.colorbar()
-    if save_fig:
-        if save_file is None:
-            save_file = fig_name
-        plt.savefig(os.path.join(save_path, save_file + '.png'), dpi=200)
     if show:
         plt.show()
 
