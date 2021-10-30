@@ -1,7 +1,5 @@
 ##
 # Demonstration of interpolating segmented well log data.
-import pandas as pd
-
 from well_log import *
 # The segmented well log file name.
 log_file = '/nfs/opendtect-data/Niuzhuang/Well logs/LithoCodeForPetrel/DK1.txt'
