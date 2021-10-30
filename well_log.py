@@ -2,7 +2,9 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.interpolate
+import scipy.spatial
 import math
+import segyio
 
 
 def resample_log(df_log=None, delta=None, depth_col='depth', log_col=None, method='average', abnormal_value=None,
@@ -360,3 +362,72 @@ def plotlog(df=None, depth=None, log=None, fill_log=True, cmap='rainbow',
             plt.fill_betweenx(df[depth], 0, curve, where=curve >= index, color=color)
     if show:
         plt.show()
+
+
+def rock_physics(df=None, vp_col=None, vs_col=None, den_col=None,
+                 switch=None):
+    """
+    Compute rock-physics parameters.
+    :param df: (Pandas.DataFrame) - Well log data frame.
+    :param vp_col: (String) - P-wave velocity column name.
+    :param vs_col: (String) - S-wave velocity column name.
+    :param den_col: (String) - Density column name.
+    :param switch: (List of bools) - Default is [True, True, True], which means to compute P-wave impedance, S-wave
+                   impedance and Shear Modulus, Bulk Modulus, Young's Modulus and Poisson's Ratio.
+    :return: df: (Pandas.DataFrame) - Well log data frame with rock-physics parameters.
+    """
+    if switch is None:
+        switch = [True, True, True]
+    if switch[0]:
+        df['Ip'] = df[vp_col] * df[den_col]  # P-wave impedance.
+    if switch[1]:
+        df['Is'] = df[vs_col] * df[den_col]  # S-wave impedance.
+    if switch[2]:
+        df['Shear Modulus'] = df[vs_col]**2 * df[den_col]  # Shear modulus.
+        lame = df[vp_col] ** 2 * df[den_col] - 2 * df['Shear Modulus']  # Lame constant.
+        df['Bulk Modulus'] = (3 * lame + 2 * df['Shear Modulus']) / 3  # Bulk modulus.
+        df["Poisson's Ratio"] = lame / (2 * (lame * df['Shear Modulus']))  # Poisson's ratio.
+        df["Young's Modulus"] = 2 * df['Shear Modulus'] * (1 + df["Poisson's Ratio"])  # Young's modulus.
+    return df
+
+
+def getdata_from_cube(df=None, x_col=None, y_col=None, z_col=None, cube_file=None, cube_name=None):
+    """
+    Get up-hole trace data from cube and add them to well log data frame.
+    :param df: (Pandas.Dataframe) - Well log data frame, which has to contain x, y and z coordinate column.
+    :param x_col: (String) - X-coordinate column name.
+    :param y_col: (String) - Y-coordinate column name.
+    :param z_col: (String) - Z-coordinate column name.
+    :param cube_file: (String) - Cube file name.
+    :param cube_name: (String) - Cube data name, which will be a new column name in well log data frame.
+    :return: df: (Pandas.Dataframe) - Well log data frame with a new column of up-hole trace data from cube.
+    """
+    # Load cube.
+    with segyio.open(cube_file) as f:
+        f.mmap()  # Memory map file for faster reading.
+        cube = segyio.tools.cube(f)  # Load cube data.
+        x = np.zeros(shape=(f.tracecount,), dtype='float32')  # Initiate trace x-coordinates.
+        y = np.zeros(shape=(f.tracecount,), dtype='float32')  # Initiate trace y-coordinates.
+        for i in range(f.tracecount):
+            x[i] = f.header[i][73] * 1e-1  # Get x-coordinates from trace header.
+            y[i] = f.header[i][77] * 1e-1  # Get y-coordinates from trace header.
+        x = x.reshape([len(f.ilines), len(f.xlines)], order='C')  # Re-shape x-coordinates array to match the cube.
+        y = y.reshape([len(f.ilines), len(f.xlines)], order='C')  # Re-shape y-coordinates array to match the cube.
+        t = f.samples  # Get sampling time.
+    f.close()
+    # Get well log's 3D coordinates.
+    well_x = df[x_col].values
+    well_y = df[y_col].values
+    well_z = df[z_col].values
+    # Match well log coordinates with cube data coordinates.
+    dist_map_xy = scipy.spatial.distance.cdist(np.c_[well_x, well_y],
+                                               np.c_[x.ravel(order='C'), y.ravel(order='C')],
+                                               metric='euclidean')  # xy plane distance map.
+    dist_z = scipy.spatial.distance.cdist(np.reshape(well_z, (-1, 1)),
+                                          np.reshape(t, (-1, 1)),
+                                          metric='minkowski', p=1)  # z-direction distance.
+    indx, indy = np.unravel_index(np.argmin(dist_map_xy, axis=1), x.shape, order='C')
+    indz = np.argmin(dist_z, axis=1)
+    # Get data from the cube.
+    df[cube_name] = cube[indx, indy, indz]
+    return df
