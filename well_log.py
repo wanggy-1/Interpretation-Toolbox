@@ -1,10 +1,13 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 import scipy.interpolate
 import scipy.spatial
 import math
 import segyio
+from prettytable import PrettyTable
+from sklearn.preprocessing import MinMaxScaler
 
 
 def resample_log(df_log=None, delta=None, depth_col='depth', log_col=None, method='average', abnormal_value=None,
@@ -431,3 +434,157 @@ def getdata_from_cube(df=None, x_col=None, y_col=None, z_col=None, cube_file=Non
     # Get data from the cube.
     df[cube_name] = cube[indx, indy, indz]
     return df
+
+
+def outlier_filter(df=None, condition=None, delete_inf=False, delete_none=False, delete_nan=False, remove_row=False):
+    """
+    Replace outliers with missing value (NaN), or remove rows with outliers in well log data frame.
+    :param df: (Pandas.Dataframe) - Well log data frame.
+    :param condition: (Dictionary) - Filter condition with well log column names and filter's ends.
+                      For example, condition={'POR': [5, 60], 'RT': [0, None], 'SW': [None, 100]} means a band-pass
+                      filter that keeps porosity values from 5% to 60%, a high-pass filter that keeps resistivity values
+                      no less than 0 ohm.m, and a low-pass filter that keeps water saturation values no more than 100%.
+    :param delete_inf: (Bool) - Default is False. Whether to replace (+-)INF with NaN, or remove the whole row with
+                       (+-)INF (control by remove_row).
+    :param delete_none: (Bool) - Default is False. Whether to replace None with NaN. Useful when importing data frame
+                        from SQL database.
+    :param delete_nan: (Bool) - Default is False. Whether to remove rows with any NaN.
+    :param remove_row: (Bool) - Default is False, whether to remove the whole row with any outlier.
+    :return: df: (Pandas.Dataframe) - Filtered well log data frame.
+    """
+    # Replace INF with NaN or remove rows with INF.
+    if delete_inf:
+        if remove_row:  # Remove rows with INF or -INF.
+            ind = [x for x in range(len(df)) if (df.iloc[x, :] == np.inf).any() or (df.iloc[x, :] == -np.inf).any()]
+            df.drop(index=ind, inplace=True)
+            df.reset_index(drop=True, inplace=True)
+        else:  # Replace INF or -INF with NaN.
+            df.replace([-np.inf, np.inf], np.nan, inplace=True)
+    # Replace None with NaN.
+    if delete_none:
+        df.fillna(np.nan, inplace=True)
+    # Remove rows with any NaN.
+    if delete_nan:
+        df.dropna(axis='index', how='any', inplace=True)
+        df.reset_index(drop=True, inplace=True)
+    # Filter outliers, replace outliers with NaN.
+    if condition is not None:
+        col = list(condition.keys())  # Get column names from condition dictionary.
+        filters = list(condition.values())  # Get filter values from condition dictionary.
+        for i in range(len(condition)):
+            l, r = filters[i][0], filters[i][1]  # Left and right end of the filter.
+            if l is not None:
+                ind = [x for x in range(len(df)) if df.loc[x, col[i]] < l]
+                if remove_row:
+                    df.drop(index=ind, inplace=True)
+                    df.reset_index(drop=True, inplace=True)
+                else:
+                    df.loc[ind, col[i]] = np.nan
+            if r is not None:
+                ind = [x for x in range(len(df)) if df.loc[x, col[i]] > r]
+                if remove_row:
+                    df.drop(index=ind, inplace=True)
+                    df.reset_index(drop=True, inplace=True)
+                else:
+                    df.loc[ind, col[i]] = np.nan
+    return df
+
+
+def check_info(df=None, log_col='all'):
+    """
+    Visualize well log info of [Log name, Samples amount, Missing value amount, Min, Max, Mean, Standard deviation].
+    :param df: (Pandas.Dataframe) - Well log data frame.
+    :param log_col: (String or list of strings) - Default is 'all', which means taking all except the first column to
+                    visualize info. Also you can manually enter the log names as a list, or just a string for one log.
+    """
+    # Use pretty table to visualize info.
+    table = PrettyTable()
+    # Set column names of the table.
+    table.field_names = ['Log name', 'Samples', 'Missing', 'Min', 'Max', 'Mean', 'Std']
+    # When log_col is a string...
+    if isinstance(log_col, str):
+        if log_col == 'all':
+            log_col = list(df.columns)[1:]
+        else:
+            log_col = [log_col]
+    # Add rows to the table.
+    for i in range(len(log_col)):
+        log_name = log_col[i]
+        n_sample = len(df[log_name])
+        n_miss = df[log_name].isna().sum()
+        minimum = df[log_name].min()
+        maximum = df[log_name].max()
+        mean = df[log_name].mean()
+        std = df[log_name].std()
+        table.add_row([log_name, n_sample, n_miss, minimum, maximum, mean, std])
+    # Display the table.
+    print(table)
+
+
+def high_cor_filter(df=None, threshold=0.9, cor_method='pearson', cor_vis=False, cmap='Reds', annot=True, fmt='.2f',
+                    vmin=None, vmax=None, annot_size=None, axis_tick_size=None,
+                    cbar_tick_size=None, cbar_label_size=None, title_size=None):
+    """
+    Remove features which are highly correlated with other features.
+    https://www.projectpro.io/recipes/drop-out-highly-correlated-features-in-python
+    :param df: (Pandas.Dataframe) - Feature data frame.
+    :param threshold: (Float) - Default is 0.9. Filter threshold, feature with correlation higher than this threshold
+                      will be removed.
+    :param cor_method: (String) - Default is 'pearson', the standard correlation coefficient.
+                       'kendall': Kendall Tau correlation coefficient.
+                       'spearman': Spearman rank correlation.
+    :param cor_vis: (Bool) - Default is False. Whether to visualize the correlation matrix with heatmap.
+    :param cmap: (String) - Color map of the heatmap.
+    :param annot: (Bool) - Default is True. Whether to write correlation value in each cell on the heatmap.
+    :param fmt: (String) - Default is '.2f'. String formatting code to use when adding annotations.
+    :param vmin: (Float) - Default is None, which is inferred from the data. Minimum value of the color map.
+    :param vmax: (Float) - Default is None, which is inferred from the data. Maximum value of the color map.
+    :param annot_size: (Integer) - Default is None, which is self-adapted to the figure. The annotation font size of
+                       the heatmap.
+    :param axis_tick_size: (Integer) - Default is None, which is self-adapted to the figure. The x and y axis tick label
+                           size of the heatmap.
+    :param cbar_tick_size: (Integer) - Default is None, which is self-adapted to the figure. The color bar tick size of
+                           the heatmap.
+    :param cbar_label_size: (Integer) - Default is None, which is self-adapted to the figure. The color bar label size
+                            of the heatmap.
+    :param title_size: (Integer) - Default is None, which is self-adapted to the figure. The title size of the heatmap.
+    :return: df: (Pandas.Dataframe) - Filtered feature data frame.
+    """
+    # Scale all features to 0~1.
+    scaler = MinMaxScaler(feature_range=(0, 1))
+    x_new = scaler.fit_transform(df.values)
+    df_new = pd.DataFrame(x_new, columns=df.columns)
+    # Compute absolute correlation matrix between features.
+    cor = df_new.corr(method=cor_method).abs()
+    # If cor_vis is True, visualize correlation matrix as a heatmap.
+    plt.figure()
+    plt.title('Correlation Matrix - Before High Correlation Filter', fontsize=title_size)
+    ax = sns.heatmap(cor, annot=annot, cmap=cmap, xticklabels=1, yticklabels=1, fmt=fmt, vmin=vmin, vmax=vmax,
+                     annot_kws={'size': annot_size})
+    ax.set_xticklabels(ax.get_xticklabels(), fontsize=axis_tick_size)
+    ax.set_yticklabels(ax.get_yticklabels(), fontsize=axis_tick_size)
+    cbar = ax.collections[0].colorbar
+    cbar.set_label('Correlation', size=cbar_label_size)
+    cbar.ax.tick_params(labelsize=cbar_tick_size)
+    # Filter out features which are highly correlated with another feature.
+    cor_u = cor.where(np.triu(np.ones(cor.shape), k=1).astype(bool))  # The correlation matrix is symmetrical.
+    drop_col = [col for col in cor_u.columns if any(cor_u[col] > threshold)]  # Columns with correlation > threshold.
+    print('Removed features:\n', drop_col)
+    df_new.drop(columns=drop_col, inplace=True)  # In this data frame all features are scaled to 0~1.
+    df.drop(columns=drop_col, inplace=True)  # This is the original data frame with unscaled features.
+    # If cor_vis is True, visualize correlation matrix after dropping out features with high correlation.
+    cor_new = df_new.corr(method=cor_method).abs()
+    plt.figure()
+    plt.title('Correlation Matrix - After High Correlation Filter', fontsize=title_size)
+    ax = sns.heatmap(cor_new, annot=annot, cmap=cmap, xticklabels=1, yticklabels=1, fmt=fmt, vmin=vmin, vmax=vmax,
+                     annot_kws={'size': annot_size})
+    ax.set_xticklabels(ax.get_xticklabels(), fontsize=axis_tick_size)
+    ax.set_yticklabels(ax.get_yticklabels(), fontsize=axis_tick_size)
+    cbar = ax.collections[0].colorbar
+    cbar.set_label('Correlation', size=cbar_label_size)
+    cbar.ax.tick_params(labelsize=cbar_tick_size)
+    # Choose whether to display correlation matrix heatmap.
+    if cor_vis:
+        plt.show()
+    return df
+
