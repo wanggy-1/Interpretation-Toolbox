@@ -1,13 +1,11 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 import scipy.interpolate
 import scipy.spatial
 import math
 import segyio
 from prettytable import PrettyTable
-from sklearn.preprocessing import MinMaxScaler
 
 
 def resample_log(df_log=None, delta=None, depth_col='depth', log_col=None, method='average', abnormal_value=None,
@@ -519,72 +517,3 @@ def check_info(df=None, log_col='all'):
         table.add_row([log_name, n_sample, n_miss, minimum, maximum, mean, std])
     # Display the table.
     print(table)
-
-
-def high_cor_filter(df=None, threshold=0.9, cor_method='pearson', cor_vis=False, cmap='Reds', annot=True, fmt='.2f',
-                    vmin=None, vmax=None, annot_size=None, axis_tick_size=None,
-                    cbar_tick_size=None, cbar_label_size=None, title_size=None):
-    """
-    Remove features which are highly correlated with other features.
-    https://www.projectpro.io/recipes/drop-out-highly-correlated-features-in-python
-    :param df: (Pandas.Dataframe) - Feature data frame.
-    :param threshold: (Float) - Default is 0.9. Filter threshold, feature with correlation higher than this threshold
-                      will be removed.
-    :param cor_method: (String) - Default is 'pearson', the standard correlation coefficient.
-                       'kendall': Kendall Tau correlation coefficient.
-                       'spearman': Spearman rank correlation.
-    :param cor_vis: (Bool) - Default is False. Whether to visualize the correlation matrix with heatmap.
-    :param cmap: (String) - Color map of the heatmap.
-    :param annot: (Bool) - Default is True. Whether to write correlation value in each cell on the heatmap.
-    :param fmt: (String) - Default is '.2f'. String formatting code to use when adding annotations.
-    :param vmin: (Float) - Default is None, which is inferred from the data. Minimum value of the color map.
-    :param vmax: (Float) - Default is None, which is inferred from the data. Maximum value of the color map.
-    :param annot_size: (Integer) - Default is None, which is self-adapted to the figure. The annotation font size of
-                       the heatmap.
-    :param axis_tick_size: (Integer) - Default is None, which is self-adapted to the figure. The x and y axis tick label
-                           size of the heatmap.
-    :param cbar_tick_size: (Integer) - Default is None, which is self-adapted to the figure. The color bar tick size of
-                           the heatmap.
-    :param cbar_label_size: (Integer) - Default is None, which is self-adapted to the figure. The color bar label size
-                            of the heatmap.
-    :param title_size: (Integer) - Default is None, which is self-adapted to the figure. The title size of the heatmap.
-    :return: df: (Pandas.Dataframe) - Filtered feature data frame.
-    """
-    # Scale all features to 0~1.
-    scaler = MinMaxScaler(feature_range=(0, 1))
-    x_new = scaler.fit_transform(df.values)
-    df_new = pd.DataFrame(x_new, columns=df.columns)
-    # Compute absolute correlation matrix between features.
-    cor = df_new.corr(method=cor_method).abs()
-    # If cor_vis is True, visualize correlation matrix as a heatmap.
-    plt.figure()
-    plt.title('Correlation Matrix - Before High Correlation Filter', fontsize=title_size)
-    ax = sns.heatmap(cor, annot=annot, cmap=cmap, xticklabels=1, yticklabels=1, fmt=fmt, vmin=vmin, vmax=vmax,
-                     annot_kws={'size': annot_size})
-    ax.set_xticklabels(ax.get_xticklabels(), fontsize=axis_tick_size)
-    ax.set_yticklabels(ax.get_yticklabels(), fontsize=axis_tick_size)
-    cbar = ax.collections[0].colorbar
-    cbar.set_label('Correlation', size=cbar_label_size)
-    cbar.ax.tick_params(labelsize=cbar_tick_size)
-    # Filter out features which are highly correlated with another feature.
-    cor_u = cor.where(np.triu(np.ones(cor.shape), k=1).astype(bool))  # The correlation matrix is symmetrical.
-    drop_col = [col for col in cor_u.columns if any(cor_u[col] > threshold)]  # Columns with correlation > threshold.
-    print('Removed features:\n', drop_col)
-    df_new.drop(columns=drop_col, inplace=True)  # In this data frame all features are scaled to 0~1.
-    df.drop(columns=drop_col, inplace=True)  # This is the original data frame with unscaled features.
-    # If cor_vis is True, visualize correlation matrix after dropping out features with high correlation.
-    cor_new = df_new.corr(method=cor_method).abs()
-    plt.figure()
-    plt.title('Correlation Matrix - After High Correlation Filter', fontsize=title_size)
-    ax = sns.heatmap(cor_new, annot=annot, cmap=cmap, xticklabels=1, yticklabels=1, fmt=fmt, vmin=vmin, vmax=vmax,
-                     annot_kws={'size': annot_size})
-    ax.set_xticklabels(ax.get_xticklabels(), fontsize=axis_tick_size)
-    ax.set_yticklabels(ax.get_yticklabels(), fontsize=axis_tick_size)
-    cbar = ax.collections[0].colorbar
-    cbar.set_label('Correlation', size=cbar_label_size)
-    cbar.ax.tick_params(labelsize=cbar_tick_size)
-    # Choose whether to display correlation matrix heatmap.
-    if cor_vis:
-        plt.show()
-    return df
-
