@@ -198,7 +198,7 @@ horizon_log_file_path = 'HorizonsLog'
 output_file_path = '/nfs/opendtect-data/Niuzhuang/Pictures'
 # Parameters.
 hl_keyword = '_dense'  # Horizon with log file keyword.
-h_keyword = '-features'  # Horizon with features file keyword.
+h_keyword = '-features-FSDI'  # Horizon with features file keyword.
 horizon = 'z3'
 feature_name = ['seismic', 'sp', 'vpvs']
 file_format = '.dat'
