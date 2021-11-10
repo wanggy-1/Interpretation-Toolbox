@@ -114,11 +114,12 @@ def visualize_horizon(df=None, x_name='x', y_name='y', value_name=None, deltax=2
     xgrid, ygrid = np.meshgrid(xnew, ynew)
     xgrid = xgrid.ravel(order='F')
     ygrid = ygrid.ravel(order='F')
-    df_grid = pd.DataFrame({'x': xgrid, 'y': ygrid})
-    df_horizon = pd.merge(left=df_grid, right=df, how='left', on=['x', 'y'])  # Merge irregular horizon on regular grid.
+    df_grid = pd.DataFrame({x_name: xgrid, y_name: ygrid})
+    # Merge irregular horizon on regular grid.
+    df_horizon = pd.merge(left=df_grid, right=df, how='left', on=[x_name, y_name])
     data = df_horizon[value_name].values
-    x = df_horizon['x'].values
-    y = df_horizon['y'].values
+    x = df_horizon[x_name].values
+    y = df_horizon[y_name].values
     # Plot horizon.
     plt.figure(figsize=(12, 8))
     if fig_name is None:
@@ -145,19 +146,21 @@ def visualize_horizon(df=None, x_name='x', y_name='y', value_name=None, deltax=2
         plt.show()
 
 
-def horizon_log(df_horizon=None, df_well_coord=None, log_file_path=None, well_name_col='well_name',
+def horizon_log(df_horizon=None, df_well_coord=None, log_file_path=None, sep=None, well_name_col='well_name',
                 well_x_col='well_X', well_y_col='well_Y', horizon_x_col='x', horizon_y_col='y', horizon_t_col='t',
-                log_t_col='TWT', log_value_col=None, log_abnormal_value=-999, log_file_suffix='.txt',
-                print_progress=False):
+                log_t_col='TWT', log_value_col=None, log_abnormal_value=None, log_file_suffix='.txt',
+                print_progress=False, w_xy=25.0, w_z=2.0):
     """
-    Mark log values on horizon.
+    Mark log values on horizon. Only for vertical well now.
     :param df_horizon: (pandas.DataFrame) - Horizon data frame which contains ['x', 'y', 't'] columns.
-    :param df_well_coord: (pandas.DataFrame) - Well coordinates data frame
-                          which contains ['well_name', 'well_x', 'well_y'] columns.
+    :param df_well_coord: (pandas.DataFrame) - Default is None, which means not to use a well coordinates data frame and
+                          the log files must contain well x and y columns. If not None, then this is a well coordinates
+                          data frame which contains ['well_name', 'well_x', 'well_y'] columns.
     :param log_file_path: (String) - Time domain well log file directory.
+    :param sep: (String) - Default is None. Column delimiter in log files.
     :param well_name_col: (String) - Default is 'well_name'. Well name column name in df_well_coord.
-    :param well_x_col: (String) - Default is 'well_X'. Well x-coordinate column name in df_well_coord.
-    :param well_y_col: (String) - Default is 'well_Y'. Well y-coordinate column name in df_well_coord.
+    :param well_x_col: (String) - Default is 'well_X'. Well x-coordinate column name.
+    :param well_y_col: (String) - Default is 'well_Y'. Well y-coordinate column name.
     :param horizon_x_col: (String) - Default is 'x'. Horizon x-coordinate column name in df_horizon.
     :param horizon_y_col: (String) - Default is 'y'. Horizon y-coordinate column name in df_horizon.
     :param horizon_t_col: (String) - Default is 't'. Horizon two-way time column name in df_horizon.
@@ -166,6 +169,10 @@ def horizon_log(df_horizon=None, df_well_coord=None, log_file_path=None, well_na
     :param log_abnormal_value: (Float) - Default is -999. Well log abnormal value.
     :param log_file_suffix: (String) - Default is '.txt'. Well log file suffix.
     :param print_progress: (Bool) - Default is False. Whether to print progress.
+    :param w_xy: (Float) - Default is 25.0.
+                 Size of x and y window in which the well xy-coordinates and horizon xy-coordinates will be matched.
+    :param w_z: (Float) - Default is 2.0.
+                Size of z window in which the well z-coordinates and horizon z-coordinates will be matched.
     :return: df_out: (pandas.DataFrame) - Output data frame which contains ['x', 'y', 't', 'log value', 'well name']
                      columns.
     """
@@ -176,18 +183,22 @@ def horizon_log(df_horizon=None, df_well_coord=None, log_file_path=None, well_na
     # Mark log values on horizon.
     for log_file in log_file_list:
         # Load well log data.
-        df_log = pd.read_csv(os.path.join(log_file_path, log_file), delimiter='\t')
-        drop_ind = [x for x in range(len(df_log)) if df_log.loc[x, log_value_col] == log_abnormal_value]
-        df_log.drop(index=drop_ind, inplace=True)
-        df_log.reset_index(drop=True, inplace=True)
+        df_log = pd.read_csv(os.path.join(log_file_path, log_file), delimiter=sep)
+        if log_abnormal_value is not None:
+            drop_ind = [x for x in range(len(df_log)) if df_log.loc[x, log_value_col] == log_abnormal_value]
+            df_log.drop(index=drop_ind, inplace=True)
+            df_log.reset_index(drop=True, inplace=True)
         # Get well name.
         well_name = log_file[:-len(log_file_suffix)]
         # Print progress.
         if print_progress:
             sys.stdout.write('\rMatching well %s' % well_name)
-        # Get well coordinates from well coordinate file.
-        [well_x, well_y] = \
-            np.squeeze(df_well_coord[df_well_coord[well_name_col] == well_name][[well_x_col, well_y_col]].values)
+        if df_well_coord is not None:
+            # Get well coordinates from well coordinate file.
+            [well_x, well_y] = \
+                np.squeeze(df_well_coord[df_well_coord[well_name_col] == well_name][[well_x_col, well_y_col]].values)
+        else:
+            well_x, well_y = df_log.loc[0, well_x_col], df_log.loc[0, well_y_col]
         # Get horizon coordinates.
         horizon_x = df_horizon[horizon_x_col].values
         horizon_y = df_horizon[horizon_y_col].values
@@ -195,53 +206,60 @@ def horizon_log(df_horizon=None, df_well_coord=None, log_file_path=None, well_na
         xy_dist = np.sqrt((horizon_x - well_x) ** 2 + (horizon_y - well_y) ** 2)
         # Get array index of minimum distance in distance map. This is the horizon coordinate closest to the well.
         idx_xy = np.argmin(xy_dist)
-        # Get horizon two-way time at the closest point to the well.
-        horizon_t = df_horizon.loc[idx_xy, horizon_t_col]
-        # Get well log two-way time.
-        log_t = df_log[log_t_col].values
-        # Compute distances between well log two-way time and horizon two-way time at the closest point to the well.
-        t_dist = np.abs(log_t - horizon_t)
-        # Get array index of the minimum distance. This is the vertically closest point of the well log to the horizon.
-        idx_t = np.argmin(t_dist)
-        # Get log value.
-        log_value = df_log.loc[idx_t, log_value_col]
-        # Mark log value on horizon.
-        df_out.loc[idx_xy, log_value_col] = log_value
-        # Mark well name.
-        df_out.loc[idx_xy, 'WellName'] = well_name
+        if xy_dist[idx_xy] < w_xy * 1.414:
+            # Get horizon two-way time at the closest point to the well.
+            horizon_t = df_horizon.loc[idx_xy, horizon_t_col]
+            # Get well log two-way time.
+            log_t = df_log[log_t_col].values
+            # Compute distances between well log two-way time and horizon two-way time at the closest point to the well.
+            t_dist = np.abs(log_t - horizon_t)
+            # Get array index of the minimum distance. This the vertically closest point of the well log to the horizon.
+            idx_t = np.argmin(t_dist)
+            if t_dist[idx_t] < w_z:
+                # Get log value.
+                log_value = df_log.loc[idx_t, log_value_col]
+                # Mark log value on horizon.
+                df_out.loc[idx_xy, log_value_col] = log_value
+                # Mark well name.
+                df_out.loc[idx_xy, 'WellName'] = well_name
     # Drop NaN.
-    df_out.dropna(axis='index', how='any', inplace=True)
+    df_out.dropna(axis='index', how='any', subset=[log_value_col], inplace=True)
     df_out.reset_index(drop=True, inplace=True)
     return df_out
 
 
-def plot_markers(df=None, x_col=None, y_col=None, class_col=None, wellname_col=None, class_label=None, colors=None,
-                 annotate=True, anno_color='k', anno_fontsize=12, anno_shift=None):
+def plot_markers(df=None, x_col=None, y_col=None, class_col=None, wellname_col=None,
+                 class_code=None, class_label=None, colors=None,
+                 annotate=True, anno_color='k', anno_fontsize=12, anno_shift=None, show=False):
     """
-    Plot markers on horizon.
+    Plot markers on horizon. For nominal markers only.
     :param df: (pandas.Dataframe) - Marker data frame which contains ['x', 'y', 'class', 'well name'] columns.
     :param x_col: (String) - x-coordinate column name.
     :param y_col: (String) - y-coordinate column name.
     :param class_col: (String) - Class column name.
     :param wellname_col: (String) - Well name column name.
+    :param class_code: (List of integers) - Class codes of the markers.
     :param class_label: (List of strings) - Label names of the markers.
     :param colors: (List of strings) - Color names of the markers.
     :param annotate: (Bool) - Default is True. Whether to annotate well names beside well markers.
     :param anno_color: (String) - Annotation text color.
     :param anno_fontsize: (Integer) - Default is 12. Annotation text font size.
     :param anno_shift: (List of floats) - Default is [0, 0]. Annotation text coordinates.
+    :param show: (Bool) - Default is False. Whether to show markers.
     """
     # Get class codes.
-    classes = df[class_col].copy()
-    classes.drop_duplicates(inplace=True)
-    classes = classes.values
-    classes.sort()
+    marker_class = df[class_col].copy()
+    marker_class.drop_duplicates(inplace=True)
+    marker_class = marker_class.values
+    marker_class = marker_class.astype('int')
+    marker_class.sort()
     # Plot markers.
-    for i in range(len(classes)):
-        idx = [x for x in range(len(df)) if df.loc[x, class_col] == classes[i]]
+    for i in range(len(marker_class)):
+        idx = [x for x in range(len(df)) if df.loc[x, class_col] == marker_class[i]]
         sub_frame = df.loc[idx, [x_col, y_col]]
         x, y = sub_frame.values[:, 0], sub_frame.values[:, 1]
-        plt.scatter(x, y, c=colors[classes[i]], edgecolors='k', label=class_label[classes[i]],
+        idx = np.squeeze(np.argwhere(class_code == marker_class[i]))
+        plt.scatter(x, y, c=colors[idx], edgecolors='k', label=class_label[idx],
                     s=50)
     if annotate:
         # Annotate well names.
@@ -253,16 +271,19 @@ def plot_markers(df=None, x_col=None, y_col=None, class_col=None, wellname_col=N
                 anno_shift = [0, 0]
             plt.annotate(text=well_name, xy=(x_anno, y_anno), xytext=(x_anno - anno_shift[0], y_anno + anno_shift[1]),
                          color=anno_color, fontsize=anno_fontsize)
+    plt.legend(loc='upper right', fontsize=15)
+    if show:
+        plt.show()
 
 
-def FSDI_horizon(df_horizon=None, df_horizon_log=None, coord_col=None, feature_col=None, log_col=None,
+def FSDI_horizon(df_horizon=None, df_control=None, coord_col=None, feature_col=None, log_col=None,
                  scale=True, weight=None):
     """
     Feature and Space Distance based Interpolation for horizons.
     :param df_horizon: (pandas.DataFrame) - Horizon data frame, these are points to interpolate, which should
                        contains coordinates columns and features columns.
-    :param df_horizon_log: (pandas.DataFrame) - Horizon data frame with marked log values, these are control points,
-                           which should contains coordinates columns and log columns.
+    :param df_control: (pandas.DataFrame) - Data frame of control points on the horizon,
+                                            which should contains coordinates columns and log columns.
     :param coord_col: (List of Strings) - Coordinates columns names. (e.g. ['x', 'y', 't']).
     :param feature_col: (String or list of strings) - Features columns names.
     :param log_col: (String) - Well log column name.
@@ -280,7 +301,7 @@ def FSDI_horizon(df_horizon=None, df_horizon_log=None, coord_col=None, feature_c
     # Select columns of horizon log data frame.
     if isinstance(log_col, list) and len(log_col) == 1:
         log_col = log_col[0]
-    df_l = df_horizon_log[coord_col + [log_col]].copy()
+    df_l = df_control[coord_col + [log_col]].copy()
     # Match features to control points by coordinates.
     df_l = pd.merge(left=df_l, right=df_h, on=coord_col, how='inner')
     # Assign target columns.
@@ -308,7 +329,7 @@ def FSDI_horizon(df_horizon=None, df_horizon_log=None, coord_col=None, feature_c
     min_idx = np.argmin(dist_map, axis=1)
     # Interpolate log values according to minimum distance.
     df_horizon[log_col] = control_log[min_idx]
-    return df_horizon, df_horizon_log
+    return df_horizon, df_control
 
 
 def FSDI_interhorizon(seis_file=None, seis_name=None,
@@ -505,7 +526,7 @@ def FSDI_interhorizon(seis_file=None, seis_name=None,
                              well_name_col=well_name_col, well_x_col=well_x_col, well_y_col=well_y_col,
                              horizon_x_col=horizon_x_col, horizon_y_col=horizon_y_col, horizon_t_col=horizon_z_col,
                              log_t_col=log_z_col, log_value_col=log_value_col, log_file_suffix=log_file_suffix)
-        df_interp, _ = FSDI_horizon(df_horizon=horizon_new[i], df_horizon_log=df_ctp,
+        df_interp, _ = FSDI_horizon(df_horizon=horizon_new[i], df_control=df_ctp,
                                     coord_col=[horizon_x_col, horizon_y_col, horizon_z_col], feature_col=seis_name,
                                     log_col=log_value_col, scale=True, weight=weight)
         if tight_frame:
