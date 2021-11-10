@@ -1,6 +1,7 @@
 ##
 # Demonstration of interpolating segmented well log data.
 from well_log import *
+
 # The segmented well log file name.
 log_file = '/nfs/opendtect-data/Niuzhuang/Well logs/LithoCodeForPetrel/DK1.txt'
 # Read the segmented well log as data frame.
@@ -21,8 +22,9 @@ print('Interpolated well log data frame:\n', df_log_interp)
 
 
 ##
-from well_log import *
 # Demonstration of converting well logs from depth-domain to time-domain (single well log).
+from well_log import *
+
 # Depth-domain well log file name.
 log_file = '/nfs/opendtect-data/Niuzhuang/Well logs/LithoCodeForPetrel-interpolated/DK1_interpolated.txt'
 # Depth-time relation file name.
@@ -48,8 +50,9 @@ print('Time domain well log data frame:\n', df_tlog)
 
 
 ##
-from well_log import *
 # Demonstration of converting well logs from depth-domain to time-domain (multiple well logs).
+from well_log import *
+
 # Depth-domain well log file name.
 log_file = '/nfs/opendtect-data/Niuzhuang/Well logs/Por-Perm-Sw/DK1-Por-Perm-Sw.txt'
 # Depth-time relation file name.
@@ -78,6 +81,7 @@ print('Time domain well log data frame:\n', df_tlog)
 ##
 # Demonstration of resampling time-domain well logs by seismic sampling interval (single well log).
 from well_log import *
+
 # Time-domain Well log file name.
 log_file = '/nfs/opendtect-data/Niuzhuang/Well logs/LithoCodeForPetrel-time/DK1.txt'
 # Read time-domain well log as data frame.
@@ -100,6 +104,7 @@ print('Re-sampled well log data frame (200~299 rows):\n', df_log_res[200:300])
 ##
 # Demonstration of resampling time-domain well logs by seismic sampling interval (multiple well logs).
 from well_log import *
+
 # Time-domain Well log file name.
 log_file = '/nfs/opendtect-data/Niuzhuang/Well logs/Por-Perm-Sw-time/DK1.txt'
 # Read time-domain well log as data frame.
@@ -122,6 +127,7 @@ print('Re-sampled well log data frame (210~299 rows):\n', df_log_res[210:300])
 ##
 # Demonstration of making 2D cross-plot with well logging data.
 from well_log import *
+
 # Load well logging data.
 file = '/nfs/opendtect-data/Niuzhuang/Well logs/W584.csv'
 df = pd.read_csv(file)
@@ -144,6 +150,7 @@ cross_plot2D(df=df, x=x, y=y, c=c, cmap=cmap, xlabel=x_name, ylabel=y_name, titl
 ##
 # Demonstration of making 3D cross-plot of well logging data.
 from well_log import *
+
 # Load well logging data.
 file = '/nfs/opendtect-data/Niuzhuang/Well logs/W584.csv'
 df = pd.read_csv(file)
@@ -168,6 +175,7 @@ cross_plot3D(df=df, x=x, y=y, z=z, c=c, cmap=cmap, xlabel=x_name, ylabel=y_name,
 ##
 # Demonstration of visualizing well log.
 from well_log import *
+
 # Load well logging data.
 file = '/nfs/opendtect-data/Niuzhuang/Well logs/W584.csv'
 df = pd.read_csv(file)
@@ -185,104 +193,53 @@ plotlog(df, depth=depth, log=log, cmap=cmap, ylim=ylim, xlabel='Porosity - %', t
 
 
 ##
+# This is a demonstration of using FSDI to interpolate lithology on horizons.
 from horizon import *
 from matplotlib.colors import LinearSegmentedColormap
-# This is a demonstration of using FSDI to interpolate lithology on horizons.
-# Print-screen format.
-pd.options.display.max_rows = 100
-pd.options.display.max_columns = 20
-# Directory.
-base_path = '/nfs/opendtect-data/Niuzhuang/'  # Change this to your file path.
-horizon_file_path = 'Export'
-horizon_log_file_path = 'HorizonsLog'
-output_file_path = '/nfs/opendtect-data/Niuzhuang/Pictures'
-# Parameters.
-hl_keyword = '_dense'  # Horizon with log file keyword.
-h_keyword = '-features-FSDI'  # Horizon with features file keyword.
-horizon = 'z3'
-feature_name = ['seismic', 'sp', 'vpvs']
-file_format = '.dat'
-horizon_col = ['x', 'y', 't'] + feature_name
-log_name = 'Litho_Code'  # Lithology.
-well_name = 'WellName'
-feature_abnormal_value = 1e30
-log_abnormal_value = -999
-binarize = False
-save_fig = False
-# Read horizon data with features.
-df_horizon = pd.read_csv(os.path.join(base_path + horizon_file_path, horizon + h_keyword + file_format),
-                         header=None, skiprows=2, names=horizon_col, delimiter='\t')
-# Drop rows with abnormal value.
-df_horizon.mask(df_horizon == feature_abnormal_value, inplace=True)
-df_horizon.dropna(axis=0, how='any', inplace=True)
-df_horizon.reset_index(drop=True, inplace=True)
-# Adjust float decimal (2 decimal places).
-df_horizon['t'] = df_horizon['t'].round(2)
-# Read horizon data with log markers.
-df_horizon_log = pd.read_csv(os.path.join(base_path + horizon_log_file_path, horizon + hl_keyword + file_format),
-                             delimiter='\t')
-# Whether to binarize lithology.
-if binarize:
-    # Convert to binary lithology.
-    df_horizon_log.loc[df_horizon_log[log_name] == 1, log_name] = 0  # Convert to binary.
-    df_horizon_log.loc[df_horizon_log[log_name] > 1, log_name] = 1  # Convert to binary.
-# Feature and Space Distance based Interpolation (FSDI).
-df_horizon, marker = FSDI_horizon(df_horizon=df_horizon, df_horizon_log=df_horizon_log, coord_col=['x', 'y', 't'],
-                                  log_col=log_name, feature_col=feature_name)
-# Marker information.
-if binarize:
-    marker_color = ['grey', 'gold']  # Binary lithology.
-    labels = ['mudstone', 'sandstone']  # Binary lithology.
-    class_code = [0, 1]  # Lithology codes.
-    cm = LinearSegmentedColormap.from_list('custom', marker_color, len(marker_color))
-else:
-    marker_color = ['grey', 'limegreen', 'cyan', 'gold', 'darkviolet']  # Five lithology.
-    labels = ['mudstone', 'lime-mustone', 'siltstone', 'sandstone', 'gravel-sandstone']  # Five lithology.
-    class_code = [0, 1, 2, 3, 4]  # Lithology codes.
-    cm = LinearSegmentedColormap.from_list('custom', marker_color, len(marker_color))
-for i in range(len(feature_name)):
-    # Visualize horizon data.
-    visualize_horizon(df=df_horizon, value_name=feature_name[i], show=False, cmap='seismic',
-                      fig_name=horizon + '-' + feature_name[i])
-    # Plot markers.
-    plot_markers(marker, x_col='x', y_col='y', class_col=log_name, class_label=labels, colors=marker_color,
-                 wellname_col=well_name)
-    # Add legend.
-    plt.legend(loc='upper right', fontsize=15)
-    # Save figure.
-    if save_fig:
-        if binarize:
-            plt.savefig(os.path.join(output_file_path, horizon + '-' + feature_name[i] + '(BinaryLithology).png'),
-                        dpi=200)
-        else:
-            plt.savefig(os.path.join(output_file_path, horizon + '-' + feature_name[i] + '(PentaLithology).png'),
-                        dpi=200)
-# Visualize interpolation result.
-if binarize:
-    visualize_horizon(df=df_horizon, value_name=log_name, show=False, cmap=cm, fig_name=horizon + '-Lithology',
-                      nominal=True, class_code=class_code, class_label=labels,
-                      vmin=min(class_code), vmax=max(class_code))
-else:
-    visualize_horizon(df=df_horizon, value_name=log_name, show=False, cmap=cm, fig_name=horizon + '-Lithology',
-                      nominal=True, class_code=class_code, class_label=labels,
-                      vmin=min(class_code), vmax=max(class_code))
-# Plot markers.
-plot_markers(marker, x_col='x', y_col='y', class_col=log_name, class_label=labels, colors=marker_color,
-             wellname_col=well_name)
-# Add legend.
-plt.legend(loc='upper right', fontsize=15)
-# Save figure.
-if save_fig:
-    if binarize:
-        plt.savefig(os.path.join(output_file_path, horizon + '-BinaryLithology.png'), dpi=200)
-    else:
-        plt.savefig(os.path.join(output_file_path, horizon + '-PentaLithology.png'), dpi=200)
-plt.show()
+
+# Inputs.
+hor_list = ['z1', 'z2', 'z3', 'z4', 'z5', 'z6']  # Horizons on which to interpolate.
+hor_x, hor_y, hor_z = 'X', 'Y', 'Z'  # 3D coordinates names of horizons.
+well_x, well_y, well_z = 'well_X', 'well_Y', 'TWT'  # Well log z coordinate name.
+log_abnormal = -999  # Abnormal value in well log.
+feature_list = ['gailv_sp', 'seismic']  # Features which are used to control the interpolation.
+weight = [1, 1, 1, 1, 1]  # Weight of [x, y, z, feature1, feature2].
+target = 'Litho_Code'  # Interpolation target.
+hor_folder = '/nfs/opendtect-data/Niuzhuang/Export'  # Folder which contains horizon data.
+log_folder = '/nfs/opendtect-data/Niuzhuang/Well logs/LithoCodeForPetrel-time'  # Folder which contains well log data.
+well_xy_file = '/nfs/opendtect-data/Niuzhuang/Well logs/well_locations.prn'  # Well location file name.
+hor_suffix = '-features-clustering.dat'  # Horizon file name suffix.
+marker_color = ['grey', 'limegreen', 'cyan', 'gold', 'darkviolet']  # Color of 5 lithology classes.
+labels = ['mudstone', 'lime-mudstone', 'siltstone', 'sandstone', 'gravel-sandstone']  # Labels of 5 lithology classes.
+class_code = [0, 1, 2, 3, 4]  # Lithology codes.
+
+# Load well location.
+df_well_xy = pd.read_csv(well_xy_file, delimiter='\s+')
+
+# Interpolation and visualization.
+for hor in hor_list:
+    sys.stdout.write('Interpolating %s on %s...' % (target, hor))
+    df_hor = pd.read_csv(os.path.join(hor_folder, hor + hor_suffix), delimiter='\t',
+                         usecols=[hor_x, hor_y, hor_z] + feature_list)
+    control = horizon_log(df_horizon=df_hor[[hor_x, hor_y, hor_z]], df_well_coord=df_well_xy, log_file_path=log_folder,
+                          sep='\t', well_x_col=well_x, well_y_col=well_y, log_t_col=well_z,
+                          horizon_x_col=hor_x, horizon_y_col=hor_y, horizon_t_col=hor_z,
+                          log_value_col=target, log_abnormal_value=log_abnormal)
+    df_itp, _ = FSDI_horizon(df_horizon=df_hor, df_control=control, coord_col=[hor_x, hor_y, hor_z],
+                             feature_col=feature_list, log_col=target, weight=weight)
+    sys.stdout.write(' Done.\n')
+    cm = LinearSegmentedColormap.from_list('custom', marker_color, len(marker_color))  # Customized colormap.
+    visualize_horizon(df=df_itp, x_name=hor_x, y_name=hor_y, value_name=target, cmap=cm, vmin=min(class_code),
+                      vmax=max(class_code), nominal=True, class_code=class_code, class_label=labels,
+                      fig_name=f'{hor}-{target}')
+    plot_markers(df=control, x_col=hor_x, y_col=hor_y, class_col=target, wellname_col='WellName',
+                 class_code=class_code, class_label=labels, colors=marker_color)
 
 
 ##
-from horizon import *
 # Demonstration of using FSDI to interpolate lithology between horizons.
+from horizon import *
+
 seis_file = '/nfs/opendtect-data/Niuzhuang/Export/seismic_east.sgy'
 hor_file = ['/nfs/opendtect-data/Niuzhuang/Export/T4_east_dense.dat',
             '/nfs/opendtect-data/Niuzhuang/Export/z1_east_dense.dat',
@@ -305,8 +262,9 @@ FSDI_interhorizon(seis_file=seis_file, seis_name='seis_amp',
 
 
 ##
-from cube import *
 # Demonstration of using FSDI to interpolate lithology in cube.
+from cube import *
+
 multi_file = False
 if multi_file:
     seismic_file = ['/nfs/opendtect-data/Niuzhuang/Export/seismic_east.sgy',
