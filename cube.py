@@ -9,46 +9,49 @@ from sklearn.preprocessing import MinMaxScaler
 from scipy.spatial.distance import cdist
 
 
-def FSDI(seismic_file, log_dir, output_file,
-         vertical_well=True, abnormal_value=-999, method='average', scale=True, weight=None,
-         log_name=None, depth_name=None, coord_name=None, seis_name=None, well_name=None,
-         well_location_file=None, well_name_loc=None, coord_name_loc=None):
+def FSDI(seismic_file=None, seis_name=None, scale=True, weight=None,
+         log_dir=None, vertical_well=True, log_name=None, depth_name=None, coord_name=None,
+         abnormal_value=None, resample_method=None,
+         well_location_file=None, well_name_loc=None, coord_name_loc=None,
+         output_file=None):
     """
     Feature and distance based interpolation (FSDI) for cubes.
     :param seismic_file: (Strings or list of strings) - Seismic attributes file name (segy or sgy format).
                          For single file, directly enter file name.
                          For multiple files, enter file names as list of strings, e.g. ['a.sgy', 'b.sgy'].
-    :param log_dir: (String) - Well log file directory.
+    :param seis_name: (String or list of strings) - Seismic attribute column name.
+                      For single attribute, directly enter attribute name like 'amplitude'.
+                      For multiple attributes, enter attribute names as list of strings, e.g. ['amplitude', 'phase'].
+    :param scale: (Bool) - Default is True (recommended). Whether to scale coordinates and seismic attributes to
+                  0 and 1 with MinMaxScalar.
+    :param weight: (List of floats) - Default is that all features (including spatial coordinates) have equal weight.
+                                      Weight of spatial coordinates and features, e.g. [1, 1, 1, 2, 2] for
+                                      ['x', 'y', 'z', 'amplitude', 'vp'].
+    :param log_dir: (String) - Time domain well log file directory.
+    :param vertical_well: (Bool) - Whether the wells are vertical.
+                          If True, will process wells as vertical wells, the well log files must have columns:
+                          depth (depth_name) and log (log_name), and well location file is required.
+                          If False, will process wells as inclined wells, the well log files must
+                          have columns: x (coord_name[0]), y (coord_name[1]), depth (depth_name) and log (log_name).
+    :param log_name: (String or list of strings) - Well log name.
+                     For single log, directly enter log name like 'porosity'.
+                     For multiple logs, enter log names as list of strings, e.g. ['Litho_Code', 'porosity'].
+    :param depth_name: (String) - Well log depth column name.
+    :param coord_name: (List of strings) - Well coordinate column names, e.g. ['X', 'Y'].
+    :param abnormal_value: (Float) - Default is None, which means no abnormal values in well logs.
+                            The abnormal value in log column.
+    :param resample_method: (Strings) - Default is None, which is not to resample well logs.
+                            Well log re-sampling method, it will resample the time domain well logs to the sampling
+                            interval of seismic data.
+                            Optional methods: 'nearest', 'average', 'median', 'rms', 'most_frequent'.
+    :param well_location_file: (String) - Well location file name. Only used when vertical_well=True.
+    :param well_name_loc: (String) - Well name column name in well location file. Only used when vertical_well=True.
+    :param coord_name_loc: (List of strings) - Well coordinate column nae in well location file.
+                           Only used when vertical_well=True.
     :param output_file: (String or list of strings) - Output file name (ASCII) for interpolation results.
                         For single file, directly enter file name.
                         For multiple files, enter file names as list of strings, e.g. ['a.txt', 'b.txt'].
                         Note that the number of output files should match with the number of logs.
-    :param vertical_well: (Bool) - Whether the wells are vertical.
-                          If True, will process wells as vertical wells, the well log files must have two columns:
-                          depth (depth_name) and log (log_name).
-                          If False, will process wells as inclined wells, the well log files must
-                          have 4 columns: x (coord_name[0]), y (coord_name[1]), depth (depth_name) and log (log_name).
-    :param abnormal_value: (Float) - Default is -999. The abnormal value in log column.
-    :param method: (Strings) - Default is 'average'. Well log re-sampling method.
-                               Options: 'nearest', 'average', 'median', 'rms', 'most_frequent'.
-    :param scale: (Bool) - Default is True. Whether to scale coordinates and seismic attributes to 0 and 1 with
-                           MinMaxScalar.
-    :param weight: (List of floats) - Default is that all features (including spatial coordinates) have equal weight.
-                                      Weight of spatial coordinates and features, e.g. [1, 1, 1, 2, 2] for
-                                      ['x', 'y', 'z', 'amplitude', 'vp'].
-    :param log_name: (String or list of strings) - Well log name.
-                     For single log, directly enter log name like 'porosity'.
-                     For multiple logs, enter log names as list of strings, e.g. ['Litho_Code', 'porosity'].
-    :param depth_name: (String) - Depth column name.
-    :param coord_name: (List of strings) - Well coordinate column names, e.g. ['X', 'Y'].
-    :param seis_name: (String or list of strings) - Seismic attribute column name.
-                      For single attribute, directly enter attribute name like 'amplitude'.
-                      For multiple attributes, enter attribute names as list of strings, e.g. ['amplitude', 'phase'].
-    :param well_name: (String) - Well name column name.
-    :param well_location_file: (String) - Well location file name.
-    :param well_name_loc: (String) - Well name column name in well location file. Only used when vertical_well=True.
-    :param coord_name_loc: (List of strings) - Well coordinate column nae in well location file.
-                           Only used when vertical_well=True.
     :return: cube_itp: (numpy.ndarray) - A 4d array contains the interpolation results.
                        cube_itp[inline, xline, samples, interp_logs].
     """
@@ -87,16 +90,12 @@ def FSDI(seismic_file, log_dir, output_file,
             y = np.zeros(shape=(f.tracecount, ), dtype='float32')
             for i in range(f.tracecount):
                 sys.stdout.write('\rExtracting trace coordinates: %.2f%%' % ((i+1) / f.tracecount * 100))
-                # x[i] = f.header[i][73] * 1e-1  # Adjust coordinate according to actual condition.
-                # y[i] = f.header[i][77] * 1e-1  # Adjust coordinate according to actual condition.
                 x[i] = f.header[i][73]
                 y[i] = f.header[i][77]
             sys.stdout.write('\n')
             # Re-shape the trace coordinates array to match the seismic data cube.
             x = x.reshape([len(f.ilines), len(f.xlines)], order='C')
             y = y.reshape([len(f.ilines), len(f.xlines)], order='C')
-        # print('x:\n', x)
-        # print('y:\n', y)
         f.close()
         seis.append(cube)
     # Read well log file.
@@ -110,11 +109,13 @@ def FSDI(seismic_file, log_dir, output_file,
     for log_file in log_list:
         df = pd.read_csv(os.path.join(log_dir, log_file), delimiter='\t')
         # Drop rows with abnormal value.
-        drop_col = [x for x in range(len(df)) if df.loc[x, log_name] == abnormal_value]
-        df.drop(index=drop_col, inplace=True)
-        df.reset_index(drop=True, inplace=True)
+        if abnormal_value is not None:
+            drop_col = [x for x in range(len(df)) if df.loc[x, log_name] == abnormal_value]
+            df.drop(index=drop_col, inplace=True)
+            df.reset_index(drop=True, inplace=True)
         # Re-sample well log by seismic sampling interval.
-        df = resample_log(df, delta=dt, depth_col=depth_name, log_col=log_name, method=method)
+        if resample_method is not None:
+            df = resample_log(df, delta=dt, depth_col=depth_name, log_col=log_name, method=resample_method)
         if vertical_well:
             # Extract well coordinates from well (only for vertical wells).
             well_coord = df_loc.loc[df_loc[well_name_loc] == log_file[:-4], coord_name_loc].values  # 2d array.
@@ -158,7 +159,6 @@ def FSDI(seismic_file, log_dir, output_file,
                 for j in range(Nfile):
                     seis_ctp[i, j] = seis[j][indx, indy, indz]
         df[seis_name] = seis_ctp
-        df[well_name] = log_file[:-4]
         df_ctp = df_ctp.append(df, ignore_index=True)
         cnt += 1
         sys.stdout.write('\rAssembling well logs: %.2f%%' % (cnt / len(log_list) * 100))
