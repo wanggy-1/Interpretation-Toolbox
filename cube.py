@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pyvista as pv
 import segyio
 import time
 import sys
@@ -249,3 +250,29 @@ def FSDI(seismic_file=None, seis_name=None, scale=True, weight=None,
     t2 = time.perf_counter()
     print('Process time: %.2fs' % (t2 - t1))
     return cube_itp
+
+
+def plot_cube(cube_file=None, value_name=None, colormap='seismic', scale=None):
+    # Load cube data.
+    with segyio.open(cube_file) as f:
+        f.mmap()
+        inline = f.ilines
+        xline = f.xlines
+        s = f.samples
+        print('Inline: %d-%d [%d]' % (inline[0], inline[-1], len(inline)))
+        print('Xline: %d-%d [%d]' % (xline[0], xline[-1], len(xline)))
+        print('Samples: %d-%d [%d]' % (s[0], s[-1], len(s)))
+        data = segyio.tools.cube(f)
+    f.close()
+    # Create structured grid with pyvista.
+    x, y, z = np.meshgrid(inline, xline, s)
+    grid = pv.StructuredGrid(x, y, z)
+    grid[value_name] = np.ravel(data, order='F')
+    # Plot the cube.
+    p = pv.Plotter()
+    if scale is None:  # Golden ratio.
+        scale = min(len(inline), len(xline)) / len(s) * 0.618
+    p.add_mesh(mesh=grid, scalars=value_name, cmap=colormap)
+    p.set_scale(zscale=scale)
+    p.add_axes()
+    p.show()
