@@ -282,11 +282,10 @@ if multi_file:
     seis_name = ['SeisAmp', 'VpVs', 'SP']
 else:
     seis_name = 'SeisAmp'
-well_name = 'WellName'
 output_file = '/nfs/opendtect-data/Niuzhuang/Litho_Code_8.txt'
 well_name_loc = 'well_name'
 coord_name_loc = ['well_X', 'well_Y']
 result = FSDI(seismic_file=seismic_file, log_dir=log_dir, output_file=output_file, weight=weight,
-              method='most_frequent', log_name=log_name, depth_name=depth_name, coord_name=coord_name,
-              seis_name=seis_name, well_name=well_name,  well_location_file=well_location_file,
+              resample_method='most_frequent', log_name=log_name, depth_name=depth_name, coord_name=coord_name,
+              seis_name=seis_name,  well_location_file=well_location_file,
               well_name_loc=well_name_loc, coord_name_loc=coord_name_loc)
