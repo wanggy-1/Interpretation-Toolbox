@@ -8,6 +8,7 @@ import os
 from well_log import resample_log
 from sklearn.preprocessing import MinMaxScaler
 from scipy.spatial.distance import cdist
+from pyvistaqt import BackgroundPlotter
 
 
 def FSDI(seismic_file=None, seis_name=None, scale=True, weight=None,
@@ -252,27 +253,100 @@ def FSDI(seismic_file=None, seis_name=None, scale=True, weight=None,
     return cube_itp
 
 
-def plot_cube(cube_file=None, value_name=None, colormap='seismic', scale=None):
+def plot_cube(cube_file=None, cube_data=None, value_name=None, colormap='seismic', on='xy', scale=None, show_slice=True,
+              show_axes=True):
+    """
+    Visualize cube data.
+    :param cube_file: (String) - SEG-Y data file name. If a file name is passed to this parameter, the function will use
+                      the data in the file.
+    :param cube_data: (Numpy.3darray) - The cube data. If a 3D array is passed to this parameter, the function will use
+                      this 3D array.
+    :param value_name: (String) - Value name of the data.
+    :param colormap: (String) - Default is 'seismic'. The color map used to visualize the cube data.
+    :param on: (String) - Default is 'xy'. Options are 'xy' and 'ix'.
+                          If 'xy', the function will use trace coordinates as x and y coordinates of the cube.
+                          If 'ix', the function will use inline and cross-line numbers as x and coordinates of the cube.
+                          If input 3D array, on='xy' and the xy coordinates are automatically generated from data shape.
+    :param scale: (List of floats) - Default is None, which is not to scale the coordinates. If scaling is needed, input
+                  a length 3 list to control the scale of xyz coordinates. E.g.[10, 10, 1] means make x and y
+                  coordinates 10 times larger while z coordinates remain unchanged.
+                  Generally, when loading data from SEG-Y files, the on='xy' will make the xy coordinates way larger
+                  than z coordinates, thus requiring to scale the x and y coordinates smaller like [0.1, 0.1, 1].
+                  On the contrary, on='ix' will make the xy coordinates smaller than z coordinates, thus requiring to
+                  scale the xy coordinates larger like [10, 10, 1].
+    :param show_slice: (Bool) - Default is True. If True, will show the cube data as orthogonal slices. Otherwise will
+                       show the cube's surface.
+    :param show_axes: (Bool) - Default is True. Whether to show the coordinate axes.
+    """
     # Load cube data.
-    with segyio.open(cube_file) as f:
-        f.mmap()
-        inline = f.ilines
-        xline = f.xlines
-        s = f.samples
-        print('Inline: %d-%d [%d]' % (inline[0], inline[-1], len(inline)))
-        print('Xline: %d-%d [%d]' % (xline[0], xline[-1], len(xline)))
-        print('Samples: %d-%d [%d]' % (s[0], s[-1], len(s)))
-        data = segyio.tools.cube(f)
-    f.close()
+    if cube_file is not None:
+        with segyio.open(cube_file) as f:
+            f.mmap()  # Memory mapping for faster reading.
+            inline = f.ilines  # Get inline numbers.
+            xline = f.xlines  # Get cross-line numbers.
+            x = np.zeros(f.tracecount, dtype='float32')
+            y = np.zeros(f.tracecount, dtype='float32')
+            for i in range(f.tracecount):
+                sys.stdout.write('\rReading trace coordinates: %.2f%%' % ((i + 1) / f.tracecount * 100))
+                x[i] = f.header[i][73]  # Get x coordinate of every trace.
+                y[i] = f.header[i][77]  # Get y coordinate of every trace.
+            sys.stdout.write('\n')
+            # Re-shape the trace coordinates array to match the seismic data cube.
+            x = x.reshape([len(f.ilines), len(f.xlines)], order='C')
+            y = y.reshape([len(f.ilines), len(f.xlines)], order='C')
+            z = f.samples  # Get z coordinate of every trace.
+            # Print cube info.
+            print('Inline: %d-%d [%d]' % (inline[0], inline[-1], len(inline)))
+            print('Xline: %d-%d [%d]' % (xline[0], xline[-1], len(xline)))
+            print('X Range: [%d-%d]' % (np.amin(x), np.amax(x)))
+            print('Y Range: [%d-%d]' % (np.amin(y), np.amax(y)))
+            print('Z Range: [%d-%d]' % (z[0], z[-1]))
+            data = segyio.tools.cube(f)  # Load cube data.
+        f.close()
+    # Directly input cube data.
+    elif cube_data is not None:
+        data = cube_data.copy()
+        if data.ndim != 3:
+            raise ValueError("The input data have %d dimension(s) instead of 3" % data.ndim)
+        cube_shape = np.shape(cube_data)
+        print('Cube data shape:', cube_shape)
+        x = np.arange(0, cube_shape[0], 1)
+        y = np.arange(0, cube_shape[1], 1)
+        z = np.arange(0, cube_shape[2], 1)
+        print('X Range: [%d-%d]' % (x[0], x[-1]))
+        print('Y Range: [%d-%d]' % (y[0], y[-1]))
+        print('Z Range: [%d-%d]' % (z[0], z[-1]))
+        on = 'xy'
     # Create structured grid with pyvista.
-    x, y, z = np.meshgrid(inline, xline, s)
+    if on == 'xy':  # Use trace coordinates as x, y coordinates.
+        if cube_file is not None:
+            x, y, z = np.meshgrid(x[:, 0], y[0, :], z, indexing='ij')
+        elif cube_data is not None:
+            x, y, z = np.meshgrid(x, y, z, indexing='ij')
+    elif on == 'ix':  # Use inline and cross-line numbers as x, y coordinates.
+        x, y, z = np.meshgrid(inline, xline, z, indexing='ij')
+    else:
+        raise ValueError("The parameter 'on' can only be 'xy' or 'ix'.")
     grid = pv.StructuredGrid(x, y, z)
-    grid[value_name] = np.ravel(data, order='F')
+    if scale is not None:
+        grid.scale(scale)  # Scale the grid size.
+    grid[value_name] = np.ravel(data, order='F')  # Map cube data to the grid.
     # Plot the cube.
-    p = pv.Plotter()
-    if scale is None:  # Golden ratio.
-        scale = min(len(inline), len(xline)) / len(s) * 0.618
-    p.add_mesh(mesh=grid, scalars=value_name, cmap=colormap)
-    p.set_scale(zscale=scale)
-    p.add_axes()
-    p.show()
+    p = BackgroundPlotter(lighting='three lights')
+    sargs = dict(height=0.5, vertical=True, position_x=0.85, position_y=0.2,
+                 label_font_size=14, title_font_size=18)  # The scalar bar arguments.
+    if show_slice:  # Show interactive orthogonal slices.
+        p.add_mesh_slice_orthogonal(grid, cmap=colormap, scalar_bar_args=sargs)
+    else:  # Show the cube surface.
+        p.add_mesh(mesh=grid, scalars=value_name, cmap=colormap, scalar_bar_args=sargs)
+    if on == 'ix':
+        p.add_axes(xlabel='Inline', ylabel='Xline')  # Add an interactive axes widget in the bottom left corner.
+    else:
+        p.add_axes()
+    if show_axes:  # Show coordinate axes.
+        if on == 'xy':
+            p.show_bounds(xlabel='X', ylabel='Y', zlabel='Z')
+        elif on == 'ix':
+            p.show_bounds(xlabel='Inline', ylabel='Xline', zlabel='Z')
+        else:
+            raise ValueError("The parameter 'on' can only be 'xy' or 'ix'.")
