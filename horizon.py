@@ -125,12 +125,15 @@ def visualize_horizon(df=None, x_name='x', y_name='y', value_name=None, deltax=2
     if fig_name is None:
         plt.title('Result', fontsize=20)
     else:
-        plt.title(fig_name, fontsize=20)
+        plt.title(fig_name, fontsize=22)
     plt.ticklabel_format(style='plain')
     extent = [np.amin(x), np.amax(x), np.amin(y), np.amax(y)]
     plt.imshow(data.reshape([len(ynew), len(xnew)], order='F'),
                origin='lower', aspect='auto', vmin=vmin, vmax=vmax,
                cmap=plt.cm.get_cmap(cmap), extent=extent)
+    plt.xlabel(x_name, fontsize=18)
+    plt.ylabel(y_name, fontsize=18)
+    plt.tick_params(labelsize=14)
     if nominal:
         class_code.sort()
         tick_min = (max(class_code) - min(class_code)) / (2 * len(class_code)) + min(class_code)
@@ -138,10 +141,13 @@ def visualize_horizon(df=None, x_name='x', y_name='y', value_name=None, deltax=2
         tick_step = (max(class_code) - min(class_code)) / len(class_code)
         ticks = np.arange(start=tick_min, stop=tick_max + tick_step, step=tick_step)
         cbar = plt.colorbar(ticks=ticks)
+        cbar.set_label(value_name, fontsize=18)
         cbar.ax.set_yticklabels(class_label)
         cbar.ax.tick_params(axis='y', labelsize=16)
     else:
-        plt.colorbar()
+        cbar = plt.colorbar()
+        cbar.ax.tick_params(axis='y', labelsize=16)
+        cbar.set_label(value_name, fontsize=18)
     if show:
         plt.show()
 
