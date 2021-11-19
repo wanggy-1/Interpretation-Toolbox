@@ -392,14 +392,14 @@ def rock_physics(df=None, vp_col=None, vs_col=None, den_col=None,
     return df
 
 
-def getdata_from_cube(df=None, x_col=None, y_col=None, z_col=None, cube_file=None, cube_name=None):
+def cube2well(df=None, x_col=None, y_col=None, z_col=None, cube_file=None, cube_name=None):
     """
     Get up-hole trace data from cube and add them to well log data frame.
     :param df: (Pandas.Dataframe) - Well log data frame, which has to contain x, y and z coordinate column.
     :param x_col: (String) - X-coordinate column name.
     :param y_col: (String) - Y-coordinate column name.
     :param z_col: (String) - Z-coordinate column name.
-    :param cube_file: (String) - Cube file name.
+    :param cube_file: (String) - Cube file name. SEG-Y format.
     :param cube_name: (String) - Cube data name, which will be a new column name in well log data frame.
     :return: df: (Pandas.Dataframe) - Well log data frame with a new column of up-hole trace data from cube.
     """
