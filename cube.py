@@ -11,11 +11,11 @@ from scipy.spatial.distance import cdist
 from pyvistaqt import BackgroundPlotter
 
 
-def FSDI(seismic_file=None, seis_name=None, scale=True, weight=None,
-         log_dir=None, vertical_well=True, log_name=None, depth_name=None, coord_name=None,
-         abnormal_value=None, resample_method=None,
-         well_location_file=None, well_name_loc=None, coord_name_loc=None,
-         output_file=None):
+def FSDI_cube(seismic_file=None, seis_name=None, scale=True, weight=None,
+              log_dir=None, vertical_well=True, log_name=None, depth_name=None, coord_name=None,
+              abnormal_value=None, resample_method=None,
+              well_location_file=None, well_name_loc=None, coord_name_loc=None,
+              output_file=None):
     """
     Feature and distance based interpolation (FSDI) for cubes.
     :param seismic_file: (Strings or list of strings) - Seismic attributes file name (segy or sgy format).
@@ -253,10 +253,12 @@ def FSDI(seismic_file=None, seis_name=None, scale=True, weight=None,
     return cube_itp
 
 
-def plot_cube(cube_file=None, cube_data=None, value_name=None, colormap='seismic', on='xy', scale=None, show_slice=True,
-              show_axes=True):
+def plot_cube(cube_file=None, cube_data=None, value_name=None, colormap='seismic', on='xy', scale=None,
+              hor_list=None, hor_sep='\t', hor_header=None, hor_col_names=None,
+              hor_x=None, hor_y=None, hor_il=None, hor_xl=None, hor_z=None, hor_xwin=None, hor_ywin=None, hor_zwin=2.0,
+              show_slice=True, show_axes=True):
     """
-    Visualize cube data.
+    Visualize cube data and horizon data in the same time.
     :param cube_file: (String) - SEG-Y data file name. If a file name is passed to this parameter, the function will use
                       the data in the file.
     :param cube_data: (Numpy.3darray) - The cube data. If a 3D array is passed to this parameter, the function will use
@@ -264,9 +266,10 @@ def plot_cube(cube_file=None, cube_data=None, value_name=None, colormap='seismic
     :param value_name: (String) - Value name of the data.
     :param colormap: (String) - Default is 'seismic'. The color map used to visualize the cube data.
     :param on: (String) - Default is 'xy'. Options are 'xy' and 'ix'.
-                          If 'xy', the function will use trace coordinates as x and y coordinates of the cube.
-                          If 'ix', the function will use inline and cross-line numbers as x and coordinates of the cube.
-                          If input 3D array, on='xy' and the xy coordinates are automatically generated from data shape.
+                          If 'xy', the function will use trace coordinates as xy coordinates.
+                          If 'ix', the function will use inline and cross-line numbers as xy coordinates.
+                          If input 3D array, this parameter will be forced to be 'xy' and the xy coordinates are
+                          automatically generated from data shape.
     :param scale: (List of floats) - Default is None, which is not to scale the coordinates. If scaling is needed, input
                   a length 3 list to control the scale of xyz coordinates. E.g.[10, 10, 1] means make x and y
                   coordinates 10 times larger while z coordinates remain unchanged.
@@ -274,33 +277,52 @@ def plot_cube(cube_file=None, cube_data=None, value_name=None, colormap='seismic
                   than z coordinates, thus requiring to scale the x and y coordinates smaller like [0.1, 0.1, 1].
                   On the contrary, on='ix' will make the xy coordinates smaller than z coordinates, thus requiring to
                   scale the xy coordinates larger like [10, 10, 1].
+    :param hor_list: (List of strings) - Horizon file list. The horizon files must contain xyz coordinates or
+                     inline number, cross-line number and z coordinates, or both.
+    :param hor_sep: (String) - Default is '\t'. The column delimiter in horizon files.
+    :param hor_header: (Integer or list of integers) - Default is None, which means no header in horizon file as column
+                       names. Row number(s) to use as column names.
+    :param hor_col_names: (List of strings) - Default is None, which means to use the header in horizon file as column
+                          names. The column names of horizon data. If not None, the hor_col_names will be used as column
+                          names of the horizon data, and if there are headers in horizon files, they will be replaced by
+                          hor_col_names.
+    :param hor_x: (String) - X coordinate name of horizon data.
+    :param hor_y: (String) - Y coordinate name of horizon data.
+    :param hor_il: (String) - Inline number name of horizon data.
+    :param hor_xl: (String) - Cross-line number name of horizon data.
+    :param hor_z: (String) - Z coordinate name of horizon data.
+    :param hor_xwin: (Float) - Default is 25.0 when on=='xy' and 1.0 when on=='ix'.
+                     The window in which the horizon x coordinates (or inline numbers) will be matched with the
+                     cube x coordinates (or inline numbers).
+    :param hor_ywin: (Float) - Default is 25.0 when on=='xy' and 1.0 when on=='ix'.
+                     The window in which the horizon x coordinates (or cross-line numbers) will be matched with the
+                     cube y coordinates (or cross-line numbers).
+    :param hor_zwin: (Float) - Default is 2.0. The window in which the horizon z coordinates will be matched with the
+                     cube z coordinates.
     :param show_slice: (Bool) - Default is True. If True, will show the cube data as orthogonal slices. Otherwise will
                        show the cube's surface.
     :param show_axes: (Bool) - Default is True. Whether to show the coordinate axes.
     """
-    # Load cube data.
+    # Load cube data from SEG-Y file.
     if cube_file is not None:
         with segyio.open(cube_file) as f:
             f.mmap()  # Memory mapping for faster reading.
             inline = f.ilines  # Get inline numbers.
             xline = f.xlines  # Get cross-line numbers.
-            x = np.zeros(f.tracecount, dtype='float32')
-            y = np.zeros(f.tracecount, dtype='float32')
-            for i in range(f.tracecount):
-                sys.stdout.write('\rReading trace coordinates: %.2f%%' % ((i + 1) / f.tracecount * 100))
-                x[i] = f.header[i][73]  # Get x coordinate of every trace.
-                y[i] = f.header[i][77]  # Get y coordinate of every trace.
-            sys.stdout.write('\n')
-            # Re-shape the trace coordinates array to match the seismic data cube.
-            x = x.reshape([len(f.ilines), len(f.xlines)], order='C')
-            y = y.reshape([len(f.ilines), len(f.xlines)], order='C')
+            x = np.zeros(len(inline), dtype='float32')
+            y = np.zeros(len(xline), dtype='float32')
+            for i in range(len(inline)):
+                x[i] = f.header[i * len(xline)][73]  # Get trace x coordinates.
+            for i in range(len(xline)):
+                y[i] = f.header[i][77]  # Get trace y coordinates.
             z = f.samples  # Get z coordinate of every trace.
             # Print cube info.
-            print('Inline: %d-%d [%d]' % (inline[0], inline[-1], len(inline)))
-            print('Xline: %d-%d [%d]' % (xline[0], xline[-1], len(xline)))
-            print('X Range: [%d-%d]' % (np.amin(x), np.amax(x)))
-            print('Y Range: [%d-%d]' % (np.amin(y), np.amax(y)))
-            print('Z Range: [%d-%d]' % (z[0], z[-1]))
+            print('Cube info:')
+            print('Inline: %d-%d [%d lines]' % (inline[0], inline[-1], len(inline)))
+            print('Xline: %d-%d [%d lines]' % (xline[0], xline[-1], len(xline)))
+            print('X Range: [%d-%d] [%d samples]' % (x[0], x[-1], len(x)))
+            print('Y Range: [%d-%d] [%d samples]' % (y[0], y[-1], len(y)))
+            print('Z Range: [%d-%d] [%d samples]' % (z[0], z[-1], len(z)))
             data = segyio.tools.cube(f)  # Load cube data.
         f.close()
     # Directly input cube data.
@@ -309,36 +331,114 @@ def plot_cube(cube_file=None, cube_data=None, value_name=None, colormap='seismic
         if data.ndim != 3:
             raise ValueError("The input data have %d dimension(s) instead of 3" % data.ndim)
         cube_shape = np.shape(cube_data)
-        print('Cube data shape:', cube_shape)
+        print('Cube info:')
+        print('Cube shape:', cube_shape)
         x = np.arange(0, cube_shape[0], 1)
         y = np.arange(0, cube_shape[1], 1)
         z = np.arange(0, cube_shape[2], 1)
-        print('X Range: [%d-%d]' % (x[0], x[-1]))
-        print('Y Range: [%d-%d]' % (y[0], y[-1]))
-        print('Z Range: [%d-%d]' % (z[0], z[-1]))
+        print('X Range: [%d-%d] [%d samples]' % (x[0], x[-1], len(x)))
+        print('Y Range: [%d-%d] [%d samples]' % (y[0], y[-1], len(y)))
+        print('Z Range: [%d-%d] [%d samples]' % (z[0], z[-1], len(z)))
         on = 'xy'
-    # Create structured grid with pyvista.
-    if on == 'xy':  # Use trace coordinates as x, y coordinates.
-        if cube_file is not None:
-            x, y, z = np.meshgrid(x[:, 0], y[0, :], z, indexing='ij')
-        elif cube_data is not None:
-            x, y, z = np.meshgrid(x, y, z, indexing='ij')
-    elif on == 'ix':  # Use inline and cross-line numbers as x, y coordinates.
-        x, y, z = np.meshgrid(inline, xline, z, indexing='ij')
-    else:
-        raise ValueError("The parameter 'on' can only be 'xy' or 'ix'.")
-    grid = pv.StructuredGrid(x, y, z)
-    if scale is not None:
-        grid.scale(scale)  # Scale the grid size.
-    grid[value_name] = np.ravel(data, order='F')  # Map cube data to the grid.
-    # Plot the cube.
+    # Initiate plotter.
     p = BackgroundPlotter(lighting='three lights')
     sargs = dict(height=0.5, vertical=True, position_x=0.85, position_y=0.2,
                  label_font_size=14, title_font_size=18)  # The scalar bar arguments.
+    # Plot the cube.
+    if on == 'xy':  # Use trace coordinates as x, y coordinates.
+        x_cube, y_cube, z_cube = np.meshgrid(x, y, z, indexing='ij')
+    elif on == 'ix':  # Use inline and cross-line numbers as x, y coordinates.
+        x_cube, y_cube, z_cube = np.meshgrid(inline, xline, z, indexing='ij')
+    else:
+        raise ValueError("The parameter 'on' can only be 'xy' or 'ix'.")
+    cube_grid = pv.StructuredGrid(x_cube, y_cube, z_cube)  # Create structured grid for cube.
+    if scale is not None:
+        cube_grid.scale(scale)  # Scale the grid size.
+    cube_grid[value_name] = np.ravel(data, order='F')  # Map cube data to the grid.
     if show_slice:  # Show interactive orthogonal slices.
-        p.add_mesh_slice_orthogonal(grid, cmap=colormap, scalar_bar_args=sargs)
+        p.add_mesh_slice_orthogonal(cube_grid, cmap=colormap, scalar_bar_args=sargs)
     else:  # Show the cube surface.
-        p.add_mesh(mesh=grid, scalars=value_name, cmap=colormap, scalar_bar_args=sargs)
+        p.add_mesh(mesh=cube_grid, scalars=value_name, cmap=colormap, scalar_bar_args=sargs)
+    # Plot horizons.
+    if hor_list is not None:
+        for hor in hor_list:
+            print("Loading horizon from file '%s'" % hor)
+            # Load horizons from files.
+            if hor_col_names is None:
+                df_hor = pd.read_csv(hor, delimiter=hor_sep)
+            else:
+                df_hor = pd.read_csv(hor, delimiter=hor_sep, header=hor_header, names=hor_col_names)
+            # Get horizon info.
+            if on == 'xy':
+                if df_hor[[hor_x, hor_y, hor_z]].isna().any().any():
+                    print('Can not process horizon with missing values in coordinates.')
+                    continue
+                x_temp = df_hor[hor_x].drop_duplicates().values
+                y_temp = df_hor[hor_y].drop_duplicates().values
+                print('Horizon info:')
+                print('X Range: %d-%d [%d samples]' % (x_temp[0], x_temp[-1], len(x_temp)))
+                print('Y Range: %d-%d [%d samples]' % (y_temp[0], y_temp[-1], len(y_temp)))
+            elif on == 'ix':
+                if df_hor[[hor_il, hor_xl, hor_z]].isna().any().any():
+                    print('Can not process horizon with missing values in coordinates.')
+                    continue
+                x_temp = df_hor[hor_il].drop_duplicates().values
+                y_temp = df_hor[hor_xl].drop_duplicates().values
+                print('Horizon info:')
+                print('Inline Range: %d-%d [%d samples]' % (x_temp[0], x_temp[-1], len(x_temp)))
+                print('Xline Range: %d-%d [%d samples]' % (y_temp[0], y_temp[-1], len(y_temp)))
+            if len(df_hor) != len(x_temp) * len(y_temp):
+                print("The horizon with length %d can not match inferred grid size (%d, %d)." %
+                      (len(df_hor), len(x_temp), len(y_temp)))
+                continue
+            # Get data from cube to horizon.
+            if on == 'xy':
+                x_dist = cdist(np.reshape(df_hor[hor_x].values, (-1, 1)), np.reshape(x, (-1, 1)),
+                               metric='minkowski', p=1)
+                y_dist = cdist(np.reshape(df_hor[hor_y].values, (-1, 1)), np.reshape(y, (-1, 1)),
+                               metric='minkowski', p=1)
+            elif on == 'ix':
+                x_dist = cdist(np.reshape(df_hor[hor_il].values, (-1, 1)), np.reshape(inline, (-1, 1)),
+                               metric='minkowski', p=1)
+                y_dist = cdist(np.reshape(df_hor[hor_xl].values, (-1, 1)), np.reshape(xline, (-1, 1)),
+                               metric='minkowski', p=1)
+            z_dist = cdist(np.reshape(df_hor[hor_z].values, (-1, 1)), np.reshape(z, (-1, 1)),
+                           metric='minkowski', p=1)
+            indx = np.argmin(x_dist, axis=1)
+            indy = np.argmin(y_dist, axis=1)
+            indz = np.argmin(z_dist, axis=1)
+            if hor_xwin is None:
+                if on == 'xy':
+                    hor_xwin = 25.0
+                elif on == 'ix':
+                    hor_xwin = 1.0
+            if hor_ywin is None:
+                if on == 'xy':
+                    hor_ywin = 25.0
+                elif on == 'ix':
+                    hor_ywin = 1.0
+            x_dist_min = np.amin(x_dist, axis=1)
+            y_dist_min = np.amin(y_dist, axis=1)
+            z_dist_min = np.amin(z_dist, axis=1)
+            ix = np.squeeze(np.argwhere(x_dist_min < hor_xwin))
+            iy = np.squeeze(np.argwhere(y_dist_min < hor_ywin))
+            iz = np.squeeze(np.argwhere(z_dist_min < hor_zwin))
+            ind = np.intersect1d(np.intersect1d(ix, iy), iz)
+            df_hor.loc[ind, value_name] = data[indx[ind], indy[ind], indz[ind]]
+            if on == 'xy':
+                x_hor = np.reshape(df_hor[hor_x].values, (len(x_temp), len(y_temp)), order='C')
+                y_hor = np.reshape(df_hor[hor_y].values, (len(x_temp), len(y_temp)), order='C')
+            elif on == 'ix':
+                x_hor = np.reshape(df_hor[hor_il].values, (len(x_temp), len(y_temp)), order='C')
+                y_hor = np.reshape(df_hor[hor_xl].values, (len(x_temp), len(y_temp)), order='C')
+            z_hor = np.reshape(df_hor[hor_z].values, (len(x_temp), len(y_temp)), order='C')
+            v_hor = np.reshape(df_hor[value_name].values, (len(x_temp), len(y_temp)), order='C')
+            # Create structured grid for horizon.
+            hor_grid = pv.StructuredGrid(x_hor, y_hor, z_hor)
+            if scale is not None:
+                hor_grid.scale(scale)  # Scale the grid.
+            hor_grid[value_name] = np.ravel(v_hor, order='F')  # Map horizon data to the grid.
+            p.add_mesh(hor_grid, scalars=value_name, cmap=colormap)
     if on == 'ix':
         p.add_axes(xlabel='Inline', ylabel='Xline')  # Add an interactive axes widget in the bottom left corner.
     else:
@@ -348,5 +448,3 @@ def plot_cube(cube_file=None, cube_data=None, value_name=None, colormap='seismic
             p.show_bounds(xlabel='X', ylabel='Y', zlabel='Z')
         elif on == 'ix':
             p.show_bounds(xlabel='Inline', ylabel='Xline', zlabel='Z')
-        else:
-            raise ValueError("The parameter 'on' can only be 'xy' or 'ix'.")
