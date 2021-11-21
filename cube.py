@@ -341,6 +341,7 @@ def plot_cube(cube_file=None, cube_data=None, value_name=None, colormap='seismic
         print('Z Range: [%d-%d] [%d samples]' % (z[0], z[-1], len(z)))
         on = 'xy'
     # Initiate plotter.
+    pv.set_plot_theme('ParaView')
     p = BackgroundPlotter(lighting='three lights')
     sargs = dict(height=0.5, vertical=True, position_x=0.85, position_y=0.2,
                  label_font_size=14, title_font_size=18)  # The scalar bar arguments.
@@ -448,3 +449,4 @@ def plot_cube(cube_file=None, cube_data=None, value_name=None, colormap='seismic
             p.show_bounds(xlabel='X', ylabel='Y', zlabel='Z')
         elif on == 'ix':
             p.show_bounds(xlabel='Inline', ylabel='Xline', zlabel='Z')
+    p.app.exec_()  # Show all figures.
