@@ -63,7 +63,7 @@ dependencies:
     - pyvista==0.32.1
     - pyvistaqt==0.5.0
     - qtpy==1.11.2
-    - scikit-learn==0.24.2
+    - scikit-learn==1.0.1
     - scipy==1.7.0
     - scooby==0.5.7
     - seaborn==0.11.2
@@ -76,4 +76,4 @@ dependencies:
     - wcwidth==0.2.5
     - wslink==1.1.0
     - yarl==1.7.2
-prefix: /data/2019/wgy/anaconda3/envs/itb
+prefix: /home/wangguangyu/anaconda3/envs/itb
