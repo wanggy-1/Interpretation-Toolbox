@@ -353,7 +353,8 @@ def FSDI_interhorizon(seis_file=None, seis_name=None,
                       seismic feature, input name list such as ['a', 'b'].
     :param horizon_file: (List of strings) - Horizon file list. Horizon file with suffix '.txt' or '.dat' which contains
                          ASCII data and no header. Notice that in each horizon file there must be 3 columns of
-                         x, y and t data.
+                         x, y and t data. The horizon data coordinates must match with the seismic data coordinates, or
+                         at least in the same range.
     :param horizon_col: (List of strings) - Define column names of each horizon file.
     :param horizon_x_col: (String) - Default is 'x'. X-coordinate column name of horizon file.
     :param horizon_y_col: (String) - Default is 'y'. Y-coordinate column name of horizon file.
@@ -583,3 +584,105 @@ def FSDI_interhorizon(seis_file=None, seis_name=None,
     # Print process time.
     print('Process time: %.2fs' % (t2 - t1))
     return cube_itp
+
+
+def cube2horizon(df_horizon=None, cube_file=None, hor_x=None, hor_y=None, hor_il=None, hor_xl=None, hor_z=None,
+                 value_name=None, match_on='xy', x_win=None, y_win=None, z_win=2.0):
+    """
+    Get data from a cube to a horizon with only coordinates.
+    :param df_horizon: (Pandas.DataFrame) - Horizon data frame.
+    :param cube_file: (String) - Cube data file name.
+    :param hor_x: (String) - X coordinate column name of horizon data frame.
+    :param hor_y: (String) - Y coordinate column name of horizon data frame.
+    :param hor_il: (String) - Inline number column name of horizon data frame.
+    :param hor_xl: (String) - Cross-line number column name of horizon data frame.
+    :param hor_z: (String) - Z coordinate column name of horizon data frame.
+    :param value_name: (String) - Value name of data.
+    :param match_on: (String) - Default is 'xy'. Options are 'xy' and 'ix'.
+                     If 'xy', horizon xy coordinates will be matched with cube xy coordinates to get data from cube
+                     to horizon.
+                     If 'ix', horizon inline and cross-line number will be matched with cube inline and cross-line
+                     number to get data from cube to horizon.
+    :param x_win: (Float) - Default is 25.0 when match_on=='xy' and 1.0 when match_on=='ix'.
+                  The window in which the horizon x coordinates (or inline numbers) will be matched with the
+                  cube x coordinates (or inline numbers).
+    :param y_win: (Float) - Default is 25.0 when match_on=='xy' and 1.0 when match_on=='ix'.
+                  The window in which the horizon y coordinates (or cross-line numbers) will be matched with the
+                  cube y coordinates (or cross-line numbers).
+    :param z_win: (Float) - Default is 2.0. The window in which the horizon z coordinates will be matched with the
+                  cube z coordinates.
+    :return: df_horizon: (Pandas.DataFrame) - Horizon data frame with data from the cube.
+    """
+    # Load cube data.
+    with segyio.open(cube_file) as f:
+        f.mmap()
+        inline = f.ilines
+        xline = f.xlines
+        x = np.zeros(len(inline), dtype='float32')
+        y = np.zeros(len(xline), dtype='float32')
+        for i in range(len(inline)):
+            x[i] = f.header[i * len(xline)][73]
+        for i in range(len(xline)):
+            y[i] = f.header[i][77]
+        z = f.samples
+        cube_data = segyio.tools.cube(f)
+        print('Cube info:')
+        print('Inline: %d-%d [%dlines]' % (inline[0], inline[-1], len(inline)))
+        print('Xline: %d-%d [%dlines]' % (xline[0], xline[-1], len(xline)))
+        print('X Range: [%d-%d] [%dsamples]' % (x[0], x[-1], len(x)))
+        print('Y Range: [%d-%d] [%dsamples]' % (y[0], y[-1], len(y)))
+        print('Z Range: [%d-%d] [%dsamples]' % (z[0], z[-1], len(z)))
+    f.close()
+    # Get values from cube.
+    if match_on == 'xy':
+        x_temp = df_horizon[hor_x].drop_duplicates().values
+        y_temp = df_horizon[hor_y].drop_duplicates().values
+        print('Horizon info:')
+        print('X Range: %d-%d [%d samples]' % (x_temp[0], x_temp[-1], len(x_temp)))
+        print('Y Range: %d-%d [%d samples]' % (y_temp[0], y_temp[-1], len(y_temp)))
+        x_dist = scipy.spatial.distance.cdist(np.reshape(df_horizon[hor_x].values, (-1, 1)),
+                                              np.reshape(x, (-1, 1)),
+                                              metric='minkowski', p=1)
+        y_dist = scipy.spatial.distance.cdist(np.reshape(df_horizon[hor_y].values, (-1, 1)),
+                                              np.reshape(y, (-1, 1)),
+                                              metric='minkowski', p=1)
+    elif match_on == 'ix':
+        x_temp = df_horizon[hor_il].drop_duplicates().values
+        y_temp = df_horizon[hor_xl].drop_duplicates().values
+        print('Horizon info:')
+        print('Inline Range: %d-%d [%d samples]' % (x_temp[0], x_temp[-1], len(x_temp)))
+        print('Xline Range: %d-%d [%d samples]' % (y_temp[0], y_temp[-1], len(y_temp)))
+        x_dist = scipy.spatial.distance.cdist(np.reshape(df_horizon[hor_il].values, (-1, 1)),
+                                              np.reshape(inline, (-1, 1)),
+                                              metric='minkowski', p=1)
+        y_dist = scipy.spatial.distance.cdist(np.reshape(df_horizon[hor_xl].values, (-1, 1)),
+                                              np.reshape(xline, (-1, 1)),
+                                              metric='minkowski', p=1)
+    else:
+        raise ValueError("Parameter 'match_on' can only be 'xy' or 'ix'.")
+    z_dist = scipy.spatial.distance.cdist(np.reshape(df_horizon[hor_z].values, (-1, 1)),
+                                          np.reshape(z, (-1, 1)),
+                                          metric='minkowski', p=1)
+    indx = np.argmin(x_dist, axis=1)  # Get x indexes of cube data.
+    indy = np.argmin(y_dist, axis=1)  # Get y indexes of cube data.
+    indz = np.argmin(z_dist, axis=1)  # Get z indexes of cube data.
+    if x_win is None:
+        if match_on == 'xy':
+            x_win = 25.0
+        elif match_on == 'ix':
+            x_win = 1.0
+    if y_win is None:
+        if match_on == 'xy':
+            y_win = 25.0
+        elif match_on == 'ix':
+            y_win = 1.0
+    x_dist_min = np.amin(x_dist, axis=1)  # Minimum distance of horizon x to cube x.
+    y_dist_min = np.amin(y_dist, axis=1)  # Minimum distance of horizon y to cube y.
+    z_dist_min = np.amin(z_dist, axis=1)  # Minimum distance of horizon z to cube z.
+    # Match horizon and cube coordinates in windows.
+    ix = np.squeeze(np.argwhere(x_dist_min < x_win))
+    iy = np.squeeze(np.argwhere(y_dist_min < y_win))
+    iz = np.squeeze(np.argwhere(z_dist_min < z_win))
+    ind = np.intersect1d(np.intersect1d(ix, iy), iz)
+    df_horizon.loc[ind, value_name] = cube_data[indx[ind], indy[ind], indz[ind]]
+    return df_horizon

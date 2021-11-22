@@ -285,7 +285,7 @@ else:
 output_file = '/nfs/opendtect-data/Niuzhuang/Litho_Code_8.txt'
 well_name_loc = 'well_name'
 coord_name_loc = ['well_X', 'well_Y']
-result = FSDI(seismic_file=seismic_file, log_dir=log_dir, output_file=output_file, weight=weight,
-              resample_method='most_frequent', log_name=log_name, depth_name=depth_name, coord_name=coord_name,
-              seis_name=seis_name,  well_location_file=well_location_file,
-              well_name_loc=well_name_loc, coord_name_loc=coord_name_loc)
+result = FSDI_cube(seismic_file=seismic_file, log_dir=log_dir, output_file=output_file, weight=weight,
+                   resample_method='most_frequent', log_name=log_name, depth_name=depth_name, coord_name=coord_name,
+                   seis_name=seis_name,  well_location_file=well_location_file,
+                   well_name_loc=well_name_loc, coord_name_loc=coord_name_loc)
