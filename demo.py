@@ -132,17 +132,17 @@ from well_log import *
 file = '/nfs/opendtect-data/Niuzhuang/Well logs/W584.csv'
 df = pd.read_csv(file)
 # Choose well logs as x and y coordinates of scatters.
-x = 'AC'  # The column name in df.
-y = 'DEN'  # The column name in df.
+x = 'GR'  # The column name in df.
+y = 'SP'  # The column name in df.
 # Choose well log as colors of scatters.
-c = 'GR'  # The column name in df.
+c = 'Lith'  # The column name in df.
 # Choose a colormap.
 cmap = 'rainbow'
 # Define x and y axis name.
-x_name = 'Acoustic Compressional - us/m'
-y_name = 'Bulk Density - g/cm3'
+x_name = 'Gamma Ray (GR) - API'
+y_name = 'Spontaneous Potential (SP) - mV'
 # Define color bar name.
-cb_name = 'Gamma Ray - API'
+cb_name = 'Lithology Code'
 # Make cross-plot.
 cross_plot2D(df=df, x=x, y=y, c=c, cmap=cmap, xlabel=x_name, ylabel=y_name, title='W584', colorbar=cb_name)
 
@@ -159,7 +159,7 @@ x = 'AC'  # The column name in df.
 y = 'DEN'  # The column name in df.
 z = 'SP'  # The column name in df.
 # Choose well log as colors of scatters.
-c = 'GR'  # The column name in df.
+c = 'Lith'  # The column name in df.
 # Choose a color map.
 cmap = 'rainbow'
 # Define x, y and z axis names.
@@ -167,7 +167,7 @@ x_name = 'Acoustic Compressional - us/m'
 y_name = 'Bulk Density - g/cm3'
 z_name = 'Spontaneous Potential - mV'
 # Define color bar name.
-cb_name = 'Gamma Ray - API'
+cb_name = 'Lithology Code'
 cross_plot3D(df=df, x=x, y=y, z=z, c=c, cmap=cmap, xlabel=x_name, ylabel=y_name, zlabel=z_name, colorbar=cb_name,
              title='W584')
 
@@ -193,12 +193,99 @@ plotlog(df, depth=depth, log=log, cmap=cmap, ylim=ylim, xlabel='Porosity - %', t
 
 
 ##
+# This is a demonstration of visualizing a horizon on the xoy plane.
+from horizon import *
+
+# Select a horizon file.
+hor_file = '/nfs/shengli2020/Niuzhuang/Horizons/T4_dense.dat'
+
+# Load horizon data as a data frame.
+df_hor = pd.read_csv(hor_file, delimiter='\t', names=['INLINE', 'XLINE', 'X', 'Y', 'Z'])
+
+# Visualize the horizon's depth.
+visualize_horizon(df=df_hor, x_name='INLINE', y_name='XLINE', value_name='Z', deltax=1.0, deltay=1.0, cmap='rainbow',
+                  vmin=1700, vmax=2200, fig_name='Horizon Depth (in time domain)')
+
+
+##
+# This is a demonstration of extracting data from a cube to a horizon.
+from horizon import *
+
+# Select a cube file.
+cube_file = '/nfs/shengli2020/Niuzhuang/Post-stack seismic/nz.sgy'
+
+# Select a horizon file.
+horizon_file = '/nfs/shengli2020/Niuzhuang/Horizons/T4_dense.dat'
+
+# Load horizon data as data frame.
+df_horizon = pd.read_csv(horizon_file, delimiter='\t', names=['INLINE', 'XLINE', 'X', 'Y', 'Z'], header=None)
+
+# Get data from the cube to the horizon.
+df_horizon = cube2horizon(df_horizon=df_horizon, cube_file=cube_file, hor_x='X', hor_y='Y', hor_il='INLINE',
+                          hor_xl='XLINE', hor_z='Z', match_on='ix', value_name='seismic')
+
+# Visualize the result.
+visualize_horizon(df=df_horizon, x_name='INLINE', y_name='XLINE', value_name='seismic', deltax=1, deltay=1)
+
+
+##
+# This is a demonstration of marking lithology codes on a horizon with seismic data.
+from horizon import *
+from matplotlib.colors import LinearSegmentedColormap
+
+# Select a seismic data file.
+cube_file = '/nfs/shengli2020/Niuzhuang/Post-stack seismic/nz.sgy'
+
+# Select a horizon file.
+hor_file = '/nfs/shengli2020/Niuzhuang/Horizons/T4_dense.dat'
+
+# Select a time domain well log folder.
+log_folder = '/nfs/opendtect-data/Niuzhuang/Well logs/LithoCodeForPetrel-time'
+
+# The log files contain no column about well location, so we need the well location file.
+well_xy_file = '/nfs/opendtect-data/Niuzhuang/Well logs/well_locations.prn'
+
+# Load horizon data as data frame.
+df_hor = pd.read_csv(hor_file, delimiter='\t', names=['INLINE', 'XLINE', 'X', 'Y', 'Z'], header=None)
+
+# Get data from seismic cube file to the horizon.
+df_hor = cube2horizon(df_horizon=df_hor, cube_file=cube_file, hor_x='X', hor_y='Y', hor_il='INLINE',
+                     hor_xl='XLINE', hor_z='Z', match_on='ix', value_name='seismic')
+
+# Load well locations as data frame.
+df_well_xy = pd.read_csv(well_xy_file, delimiter='\s+')
+
+# Check the well location data frame.
+print(df_well_xy)
+
+# The log to be marked on the horizon are lithology codes, so we need to create a segmented colormap.
+labels = ['mudstone', 'lime-mudstone', 'siltstone', 'sandstone', 'gravel-sandstone']  # Lithology names.
+class_code = [0, 1, 2, 3, 4]  # Lithology codes.
+marker_colors = ['grey', 'limegreen', 'cyan', 'gold', 'darkviolet']  # Colors in colormap.
+cm = LinearSegmentedColormap.from_list('custome', marker_colors, len(marker_colors))  # Segmented colormap.
+
+# Create markers.
+marker = horizon_log(df_horizon=df_hor[['X', 'Y', 'Z']], log_file_path=log_folder, df_well_coord=df_well_xy,
+                     sep='\t', well_x_col='well_X', well_y_col='well_Y', log_t_col='TWT',
+                     log_value_col='Litho_Code', log_abnormal_value=-999,
+                     horizon_x_col='X', horizon_y_col='Y', horizon_t_col='Z',
+                     print_progress=True)
+
+# Visualize the horizon.
+visualize_horizon(df=df_hor, x_name='X', y_name='Y', deltax=25, deltay=25, value_name='seismic', cmap='seismic')
+
+# Plot markers on the horizon.
+plot_markers(df=marker, x_col='X', y_col='Y', class_col='Litho_Code', wellname_col='WellName', class_label=labels,
+             colors=marker_colors, class_code=class_code)
+
+
+##
 # This is a demonstration of using FSDI to interpolate lithology on horizons.
 from horizon import *
 from matplotlib.colors import LinearSegmentedColormap
 
 # Inputs.
-hor_list = ['z1', 'z2', 'z3', 'z4', 'z5', 'z6']  # Horizons on which to interpolate.
+hor_list = ['z1', 'z2']  # Horizons on which to interpolate.
 hor_x, hor_y, hor_z = 'X', 'Y', 'Z'  # 3D coordinates names of horizons.
 well_x, well_y, well_z = 'well_X', 'well_Y', 'TWT'  # Well log z coordinate name.
 log_abnormal = -999  # Abnormal value in well log.
@@ -228,6 +315,13 @@ for hor in hor_list:
     df_itp, _ = FSDI_horizon(df_horizon=df_hor, df_control=control, coord_col=[hor_x, hor_y, hor_z],
                              feature_col=feature_list, log_col=target, weight=weight)
     sys.stdout.write(' Done.\n')
+    # Visualize features.
+    for feature in feature_list:
+        visualize_horizon(df=df_hor, x_name=hor_x, y_name=hor_y, value_name=feature,
+                          fig_name=f'{hor}-{feature}', cmap='seismic')
+        plot_markers(df=control, x_col=hor_x, y_col=hor_y, class_col=target, wellname_col='WellName',
+                     class_code=class_code, class_label=labels, colors=marker_color)
+    # Visualize interpolation result.
     cm = LinearSegmentedColormap.from_list('custom', marker_color, len(marker_color))  # Customized colormap.
     visualize_horizon(df=df_itp, x_name=hor_x, y_name=hor_y, value_name=target, cmap=cm, vmin=min(class_code),
                       vmax=max(class_code), nominal=True, class_code=class_code, class_label=labels,
