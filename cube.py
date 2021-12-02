@@ -11,25 +11,35 @@ from scipy.spatial.distance import cdist
 from pyvistaqt import BackgroundPlotter
 
 
-def FSDI_cube(seismic_file=None, seis_name=None, scale=True, weight=None,
-              log_dir=None, vertical_well=True, log_name=None, depth_name=None, coord_name=None,
-              abnormal_value=None, resample_method=None,
-              well_location_file=None, well_name_loc=None, coord_name_loc=None,
-              output_file=None):
+def FSDI_cube(feature_file=None, feature_name=None, header_x=73, header_y=77, scl_x=1, scl_y=1, scale=True, weight=None,
+              log_dir=None, log_file_suffix='.txt', vertical_well=True, log_name=None, depth_name=None, coord_name=None,
+              abnormal_value=None, resample_method=None, well_location_file=None, well_name_loc=None,
+              output_file=None, output_file_suffix='.dat'):
     """
     Feature and distance based interpolation (FSDI) for cubes.
-    :param seismic_file: (Strings or list of strings) - Seismic attributes file name (segy or sgy format).
+    :param feature_file: (Strings or list of strings) - Feature file name (segy or sgy format).
                          For single file, directly enter file name.
                          For multiple files, enter file names as list of strings, e.g. ['a.sgy', 'b.sgy'].
-    :param seis_name: (String or list of strings) - Seismic attribute column name.
-                      For single attribute, directly enter attribute name like 'amplitude'.
-                      For multiple attributes, enter attribute names as list of strings, e.g. ['amplitude', 'phase'].
-    :param scale: (Bool) - Default is True (recommended). Whether to scale coordinates and seismic attributes to
-                  0 and 1 with MinMaxScalar.
+    :param feature_name: (String or list of strings) - Feature name.
+                         For single attribute, directly enter attribute name like 'amplitude'.
+                         For multiple attributes, enter attribute names as list of strings, e.g. ['amplitude', 'phase'].
+    :param header_x: (Integer) - Default is 73. Trace x coordinate's byte position in trace header.
+                     73: source X, 181: X cdp.
+    :param header_y: (Integer) - Default is 77. Trace y coordinate's byte position in trace header.
+                     77: source Y, 185: Y cdp.
+    :param scl_x: (Float) - The trace x coordinates will multiply this parameter.
+                  Default is 1, which means not to scale the trace x coordinates read from trace header.
+                  For example, if scl_x=0.1, the trace x coordinates from trace header will multiply 0.1.
+    :param scl_y: (Float) - The trace y coordinates will multiply this parameter.
+                  Default is 1, which means no to scale the trace y coordinates read from trace header.
+                  For example, if scl_y=0.1, the trace y coordinates from trace header will multiply 0.1.
+    :param scale: (Bool) - Default is True (recommended). Whether to scale coordinates and features to 0 and 1 with
+                  MinMaxScalar before distance calculation.
     :param weight: (List of floats) - Default is that all features (including spatial coordinates) have equal weight.
                                       Weight of spatial coordinates and features, e.g. [1, 1, 1, 2, 2] for
                                       ['x', 'y', 'z', 'amplitude', 'vp'].
-    :param log_dir: (String) - Time domain well log file directory.
+    :param log_dir: (String) - Time domain well log file directory (folder).
+    :param log_file_suffix: (String) - Default is '.txt'. Suffix of log files in log_dir folder.
     :param vertical_well: (Bool) - Whether the wells are vertical.
                           If True, will process wells as vertical wells, the well log files must have columns:
                           depth (depth_name) and log (log_name), and well location file is required.
@@ -44,70 +54,72 @@ def FSDI_cube(seismic_file=None, seis_name=None, scale=True, weight=None,
                             The abnormal value in log column.
     :param resample_method: (Strings) - Default is None, which is not to resample well logs.
                             Well log re-sampling method, it will resample the time domain well logs to the sampling
-                            interval of seismic data.
+                            interval of feature data.
                             Optional methods: 'nearest', 'average', 'median', 'rms', 'most_frequent'.
     :param well_location_file: (String) - Well location file name. Only used when vertical_well=True.
+                               This file must contain well name column and XY coordinate columns.
+                               The well names must match the well log file name before file suffix (e.g. '.txt').
     :param well_name_loc: (String) - Well name column name in well location file. Only used when vertical_well=True.
-    :param coord_name_loc: (List of strings) - Well coordinate column nae in well location file.
-                           Only used when vertical_well=True.
     :param output_file: (String or list of strings) - Output file name (ASCII) for interpolation results.
                         For single file, directly enter file name.
                         For multiple files, enter file names as list of strings, e.g. ['a.txt', 'b.txt'].
                         Note that the number of output files should match with the number of logs.
+    :param output_file_suffix: (String) - Default is '.dat'. The suffix of the output file.
     :return: cube_itp: (numpy.ndarray) - A 4d array contains the interpolation results.
                        cube_itp[inline, xline, samples, interp_logs].
     """
-    # Read seismic file.
     t1 = time.perf_counter()  # Timer.
-    # If multiple files.
-    if isinstance(seismic_file, str):
+    # Read feature file.
+    if isinstance(feature_file, str):
         Nfile = 1
-        seismic_file = [seismic_file]
-    elif isinstance(seismic_file, list):
-        Nfile = len(seismic_file)
+        feature_file = [feature_file]
+    elif isinstance(feature_file, list):
+        Nfile = len(feature_file)
     else:
-        raise ValueError('Seismic file must be string or list of strings.')
-    seis = []  # Initiate list to store seismic data.
-    for file in seismic_file:
+        raise ValueError('Feature file must be string or list of strings.')
+    feature = []  # Initiate list to store feature data.
+    for file in feature_file:
         with segyio.open(file) as f:
-            print('Read seismic data from file: ', file)
+            print('Read feature data from file: ', file)
             # Memory map file for faster reading (especially if file is big...)
-            mapped = f.mmap()
-            if mapped:
-                print('\tSeismic file is memory mapped.')
+            f.mmap()
             # Print file information.
-            print('\tFile info:')
-            print('\tinline range: %d-%d [%d lines]' % (f.ilines[0], f.ilines[-1], len(f.ilines)))
-            print('\tcrossline range: %d-%d [%d lines]' % (f.xlines[0], f.xlines[-1], len(f.xlines)))
-            print('\tTime range: %dms-%dms [%d samples]' % (f.samples[0], f.samples[-1], len(f.samples)))
+            print('File info:')
+            print('inline range: %d-%d [%d lines]' % (f.ilines[0], f.ilines[-1], len(f.ilines)))
+            print('crossline range: %d-%d [%d lines]' % (f.xlines[0], f.xlines[-1], len(f.xlines)))
+            print('Time range: %dms-%dms [%d samples]' % (f.samples[0], f.samples[-1], len(f.samples)))
             dt = segyio.tools.dt(f) / 1000
-            print('\tSampling interval: %.1fms' % dt)
-            print('\tTotal traces: %d' % f.tracecount)
-            # Read seismic data.
+            print('Sampling interval: %.1fms' % dt)
+            print('Total traces: %d' % f.tracecount)
+            # Read feature data.
             cube = segyio.tools.cube(f)
-            # Read sampling time.
-            t = f.samples
-            # Extract trace coordinates from trace header.
-            x = np.zeros(shape=(f.tracecount, ), dtype='float32')
-            y = np.zeros(shape=(f.tracecount, ), dtype='float32')
-            for i in range(f.tracecount):
-                sys.stdout.write('\rExtracting trace coordinates: %.2f%%' % ((i+1) / f.tracecount * 100))
-                x[i] = f.header[i][73]
-                y[i] = f.header[i][77]
-            sys.stdout.write('\n')
-            # Re-shape the trace coordinates array to match the seismic data cube.
-            x = x.reshape([len(f.ilines), len(f.xlines)], order='C')
-            y = y.reshape([len(f.ilines), len(f.xlines)], order='C')
+            if file == feature_file[-1]:
+                # Read sampling time.
+                t = f.samples
+                # Extract trace coordinates from trace header.
+                x = np.zeros(shape=(f.tracecount, ), dtype='float32')
+                y = np.zeros(shape=(f.tracecount, ), dtype='float32')
+                for i in range(f.tracecount):
+                    sys.stdout.write('\rExtracting trace coordinates: %.2f%%' % ((i+1) / f.tracecount * 100))
+                    x[i] = f.header[i][header_x] * scl_x
+                    y[i] = f.header[i][header_y] * scl_y
+                sys.stdout.write('\n')
+                # Re-shape the trace coordinates array to match the feature data cube.
+                x = x.reshape([len(f.ilines), len(f.xlines)], order='C')
+                y = y.reshape([len(f.ilines), len(f.xlines)], order='C')
+                print('X range: %.2f-%.2f' % (np.amin(x), np.amax(x)))
+                print('Y range: %.2f-%.2f' % (np.amin(y), np.amax(y)))
         f.close()
-        seis.append(cube)
+        feature.append(cube)
     # Read well log file.
     log_list = os.listdir(log_dir)  # Well log file list.
     # Initiate control points data frame.
     df_ctp = pd.DataFrame()
-    if vertical_well:
-        # Read well locations.
+    if well_location_file is not None:
+        # Read well locations from the well location file.
         df_loc = pd.read_csv(well_location_file, delimiter='\s+')
-    cnt = 0
+    well_in_area = []
+    sys.stdout.write('Assembling well logs...')
     for log_file in log_list:
         df = pd.read_csv(os.path.join(log_dir, log_file), delimiter='\t')
         # Drop rows with abnormal value.
@@ -118,72 +130,86 @@ def FSDI_cube(seismic_file=None, seis_name=None, scale=True, weight=None,
         # Re-sample well log by seismic sampling interval.
         if resample_method is not None:
             df = resample_log(df, delta=dt, depth_col=depth_name, log_col=log_name, method=resample_method)
-        if vertical_well:
-            # Extract well coordinates from well (only for vertical wells).
-            well_coord = df_loc.loc[df_loc[well_name_loc] == log_file[:-4], coord_name_loc].values  # 2d array.
-            if (np.squeeze(well_coord)[0] > np.amax(x) or np.squeeze(well_coord)[0] < np.amin(x)) and \
-                    (np.squeeze(well_coord)[1] > np.amax(y) or np.squeeze(well_coord)[1] < np.amin(y)):
-                continue  # Check if this well is in target area.
-        # Change well coordinates to their nearest seismic data coordinates.
-        seis_coord = np.c_[x.ravel(), y.ravel()]  # Seismic data coordinates.
+        # Change well coordinates to their nearest cube data coordinates.
+        cube_coord = np.c_[x.ravel(), y.ravel()]  # cube data coordinates.
         if vertical_well:  # For vertical well.
-            ind = np.argmin(np.sqrt(np.sum((well_coord - seis_coord) ** 2, axis=1)))
-            well_coord = seis_coord[ind]
+            if well_location_file is not None:  # Get well coordinates from well location file.
+                well_coord = df_loc.loc[df_loc[well_name_loc] == log_file[:-len(log_file_suffix)],
+                                        coord_name].values  # 2d array.
+            else:  # Get well coordinates from coordinate columns in well log data frame.
+                well_coord = df[coord_name].values[0]  # Coordinates at each rows are the same, get the first one.
+            if np.squeeze(well_coord)[0] > np.amax(x) or np.squeeze(well_coord)[0] < np.amin(x) or \
+                    np.squeeze(well_coord)[1] > np.amax(y) or np.squeeze(well_coord)[1] < np.amin(y):
+                continue  # This well is not in target area, skip to the next well.
+            else:
+                well_in_area.append(log_file[:-len(log_file_suffix)])  # Record wells in target area.
+            xy_dist = np.sqrt(np.sum((well_coord - cube_coord) ** 2, axis=1))
+            ind = np.argmin(xy_dist)
+            well_coord = cube_coord[ind]
             well_coord = np.ones(shape=[len(df), 2]) * well_coord
-        else:  # For inclined well.
-            for i in range(len(df)):
-                log_coord = df.loc[i, coord_name].values  # 1d array.
-                if (np.squeeze(log_coord)[0] > np.amax(x) or np.squeeze(log_coord)[0] < np.amin(x)) and \
-                        (np.squeeze(log_coord)[1] > np.amax(y) or np.squeeze(log_coord)[1] < np.amin(y)):
-                    continue  # Check if this log location is in target area.
-                ind = np.argmin(np.sqrt(np.sum((log_coord - seis_coord) ** 2, axis=1)))
-                log_coord = seis_coord[ind]
-                df.loc[i, coord_name] = log_coord
-        if vertical_well:
             # Add well coordinate to data frame.
             data = np.c_[well_coord, df.values]
             if isinstance(log_name, str):
                 df = pd.DataFrame(data=data, columns=coord_name + [depth_name, log_name], copy=True)
-            if isinstance(log_name, list):
+            elif isinstance(log_name, list):
                 df = pd.DataFrame(data=data, columns=coord_name + [depth_name] + log_name, copy=True)
-        # Add seismic features at control points (well log) to data frame.
-        seis_ctp = np.zeros(shape=[len(df), Nfile], dtype='float32')
+            else:
+                raise ValueError("'log_name' can only be a string or list of strings.")
+        else:  # For inclined well.
+            flag = 0
+            for i in range(len(df)):
+                sys.stdout.write('Changing inclined well log coordinates to nearest cube data coordinates: %.2f%%' %
+                                 ((i+1) / len(df)))
+                log_coord = df.loc[i, coord_name].values  # 1d array.
+                if log_coord[0] > np.amax(x) or log_coord[0] < np.amin(x) or \
+                        log_coord[1] > np.amax(y) or log_coord[1] < np.amin(y):
+                    continue  # This log sample's location is not in target area.
+                else:
+                    if flag == 0:
+                        well_in_area.append(log_file[:-len(log_file_suffix)])  # Record wells in target area.
+                        flag = 1
+                xy_dist = np.sqrt(np.sum((log_coord - cube_coord) ** 2, axis=1))
+                ind = np.argmin(xy_dist)
+                log_coord = cube_coord[ind]
+                df.loc[i, coord_name] = log_coord
+            sys.stdout.write('\n')
+        # Add features at control points (well log) to data frame.
+        feature_ctp = np.zeros(shape=[len(df), Nfile], dtype='float32')
         if vertical_well:  # Vertical well.
             indx, indy = np.squeeze(np.argwhere((x == well_coord[0, 0]) & (y == well_coord[0, 1])))
             indz0 = np.squeeze(np.argwhere(t == df[depth_name].min()))
             indz1 = np.squeeze(np.argwhere(t == df[depth_name].max()))
             for i in range(Nfile):
-                seis_ctp[:, i] = seis[i][indx, indy, indz0:indz1+1]
+                feature_ctp[:, i] = feature[i][indx, indy, indz0:indz1+1]
         else:  # Inclined well.
             for i in range(len(df)):
                 indx, indy = np.squeeze(np.argwhere((x == df.loc[i, coord_name[0]]) & (y == df.loc[i, coord_name[1]])))
                 indz = np.squeeze(np.argwhere(t == df.loc[i, depth_name]))
                 for j in range(Nfile):
-                    seis_ctp[i, j] = seis[j][indx, indy, indz]
-        df[seis_name] = seis_ctp
+                    feature_ctp[i, j] = feature[j][indx, indy, indz]
+        df[feature_name] = feature_ctp
         df_ctp = df_ctp.append(df, ignore_index=True)
-        cnt += 1
-        sys.stdout.write('\rAssembling well logs: %.2f%%' % (cnt / len(log_list) * 100))
-    sys.stdout.write('\n')
-    print(df_ctp)
+    sys.stdout.write(' Done.\n')
+    if len(well_in_area) == 0:
+        raise ValueError('No well in target area, please check well coordinates and cube data coordinates.')
     # FSDInterpolation.
     if weight is None:
         weight = np.ones(Nfile + 3)  # Equal weight of all features.
     else:
-        weight = np.array(weight)  # Custom feature weight.
+        weight = np.array(weight)  # Customized feature weight.
     # Scale.
     if scale:
         # MinMaxScalar.
         xy_scalar = MinMaxScaler()  # x and y scalar.
         t_scalar = MinMaxScaler()  # Two-way time scalar.
-        seis_scalar = MinMaxScaler()  # Seismic attributes scalar.
+        feature_scalar = MinMaxScaler()  # Feature scalar.
         # Fit.
         xy_scalar.fit(np.c_[x.ravel(order='C'), y.ravel(order='C')])
         t_scalar.fit(t.reshape(-1, 1))
-        seis_r = np.zeros(shape=[len(seis[0].ravel(order='C')), Nfile], dtype='float32')
+        feature_r = np.zeros(shape=[len(feature[0].ravel(order='C')), Nfile], dtype='float32')
         for i in range(Nfile):
-            seis_r[:, i] = seis[i].ravel(order='C')
-        seis_scalar.fit(seis_r)
+            feature_r[:, i] = feature[i].ravel(order='C')
+        feature_scalar.fit(feature_r)
     # Determine interpolation depth range by well log depth range.
     depth_min = df_ctp[depth_name].min()
     depth_max = df_ctp[depth_name].max()
@@ -191,24 +217,28 @@ def FSDI_cube(seismic_file=None, seis_name=None, scale=True, weight=None,
     ind_min = np.squeeze(np.argwhere(t == depth_min))
     ind_max = np.squeeze(np.argwhere(t == depth_max))
     t_cut = t[ind_min: ind_max+1]
-    np.savetxt('depth.txt', t_cut.reshape(-1, 1))
+    if output_file is not None:
+        sys.stdout.write(f'Saving interpolation depth samples to {output_file[:-len(output_file_suffix)]}_depth.txt...')
+        np.savetxt(f'{output_file[:-len(output_file_suffix)]}_depth.txt', t_cut.reshape(-1, 1))
+        sys.stdout.write(' Done.\n')
     if isinstance(log_name, list):
-        cube_itp = np.zeros(shape=[seis[0].shape[0], seis[0].shape[1], len(t_cut), len(log_name)], dtype='float32')
+        cube_itp = np.zeros(shape=[feature[0].shape[0], feature[0].shape[1], len(t_cut), len(log_name)],
+                            dtype='float32')
     elif isinstance(log_name, str):
-        cube_itp = np.zeros(shape=[seis[0].shape[0], seis[0].shape[1], len(t_cut), 1], dtype='float32')
+        cube_itp = np.zeros(shape=[feature[0].shape[0], feature[0].shape[1], len(t_cut), 1], dtype='float32')
     else:
         raise ValueError('Log column name can only be string or list of strings.')
     # Get control points.
-    if isinstance(seis_name, str):
-        seis_name = [seis_name]
-    ctp = df_ctp[coord_name + [depth_name] + seis_name].values
+    if isinstance(feature_name, str):
+        feature_name = [feature_name]
+    ctp = df_ctp[coord_name + [depth_name] + feature_name].values
     if scale:
         ctp[:, 0:2] = xy_scalar.transform(ctp[:, 0:2])  # Scale control points' x and y coordinates.
         ctp[:, 2] = np.squeeze(t_scalar.transform(ctp[:, 2].reshape(-1, 1)))  # Scale control points' TWT coordinates.
         if ctp[:, 3:].ndim == 1:
-            ctp[:, 3:] = np.squeeze(seis_scalar.transform(ctp[:, 3:].reshape(-1, 1)))
+            ctp[:, 3:] = np.squeeze(feature_scalar.transform(ctp[:, 3:].reshape(-1, 1)))
         else:
-            ctp[:, 3:] = seis_scalar.transform(ctp[:, 3:])  # Scale control points' seismic attributes.
+            ctp[:, 3:] = feature_scalar.transform(ctp[:, 3:])  # Scale control points' features.
     # Compute distance map trace by trace.
     for i in range(cube_itp.shape[0]):  # Inlines.
         for j in range(cube_itp.shape[1]):  # Trace number.
@@ -218,17 +248,17 @@ def FSDI_cube(seismic_file=None, seis_name=None, scale=True, weight=None,
             x_itp = x[i, j] * np.ones(cube_itp.shape[2], dtype='float32')  # x-coordinate.
             y_itp = y[i, j] * np.ones(cube_itp.shape[2], dtype='float32')  # y-coordinate.
             t_itp = t_cut.copy()  # Two-way time.
-            seis_itp = np.zeros(shape=[cube_itp.shape[2], Nfile], dtype='float32')  # Seismic attributes.
+            feature_itp = np.zeros(shape=[cube_itp.shape[2], Nfile], dtype='float32')  # Features.
             for n in range(Nfile):
-                seis_itp[:, n] = seis[n][i, j, ind_min: ind_max+1]
-            itp = np.c_[x_itp, y_itp, t_itp, seis_itp]  # Points to interpolate.
+                feature_itp[:, n] = feature[n][i, j, ind_min: ind_max+1]
+            itp = np.c_[x_itp, y_itp, t_itp, feature_itp]  # Points to interpolate.
             if scale:
                 itp[:, 0:2] = xy_scalar.transform(itp[:, 0:2])  # Scale interpolate points' x and y coordinates.
                 itp[:, 2] = np.squeeze(t_scalar.transform(itp[:, 2].reshape(-1, 1)))  # Scale interpolate points' TWT.
                 if itp[:, 3:].ndim == 1:
-                    itp[:, 3:] = np.squeeze(seis_scalar.transform(itp[:, 3:].reshape(-1, 1)))
+                    itp[:, 3:] = np.squeeze(feature_scalar.transform(itp[:, 3:].reshape(-1, 1)))
                 else:
-                    itp[:, 3:] = seis_scalar.transform(itp[:, 3:])  # Scale interpolate points' seismic attributes.
+                    itp[:, 3:] = feature_scalar.transform(itp[:, 3:])  # Scale interpolate points' features.
             dist_map = cdist(itp, ctp, metric='minkowski', w=weight, p=2)  # Compute distance map.
             # Get column index of minimum distance.
             min_idx = np.argmin(dist_map, axis=1)
@@ -239,21 +269,24 @@ def FSDI_cube(seismic_file=None, seis_name=None, scale=True, weight=None,
             cube_itp[i, j, :, :] = log_itp  # Write trace to cube.
     sys.stdout.write('\n')
     # Save interpolation result.
-    x_out = x.ravel(order='C')
-    y_out = y.ravel(order='C')
-    if isinstance(output_file, str):
-        output_file = [output_file]
-    for i in range(cube_itp.shape[3]):
-        sys.stdout.write('Writing interpolation result to file %s...' % output_file[i])
-        cube_out = cube_itp[:, :, :, i].reshape([cube_itp.shape[0] * cube_itp.shape[1], cube_itp.shape[2]], order='C')
-        np.savetxt(output_file[i], np.c_[x_out, y_out, cube_out], delimiter='\t')
-        sys.stdout.write('Done.\n')
+    if output_file is not None:
+        x_out = x.ravel(order='C')
+        y_out = y.ravel(order='C')
+        if isinstance(output_file, str):
+            output_file = [output_file]
+        for i in range(cube_itp.shape[3]):
+            sys.stdout.write('Saving interpolation result to file %s...' % output_file[i])
+            cube_out = cube_itp[:, :, :, i].reshape([cube_itp.shape[0] * cube_itp.shape[1], cube_itp.shape[2]],
+                                                    order='C')
+            np.savetxt(output_file[i], np.c_[x_out, y_out, cube_out], delimiter='\t')
+            sys.stdout.write('Done.\n')
     t2 = time.perf_counter()
     print('Process time: %.2fs' % (t2 - t1))
     return cube_itp
 
 
-def plot_cube(cube_file=None, cube_data=None, value_name=None, colormap='seismic', on='xy', scale=None,
+def plot_cube(cube_file=None, header_x=73, header_y=77, scl_x=1, scl_y=1,
+              cube_data=None, value_name=None, colormap='seismic', on='xy', scale=None,
               hor_list=None, hor_sep='\t', hor_header=None, hor_col_names=None,
               hor_x=None, hor_y=None, hor_il=None, hor_xl=None, hor_z=None, hor_xwin=None, hor_ywin=None, hor_zwin=2.0,
               show_slice=True, show_axes=True):
@@ -261,6 +294,16 @@ def plot_cube(cube_file=None, cube_data=None, value_name=None, colormap='seismic
     Visualize cube data and horizon data in the same time.
     :param cube_file: (String) - SEG-Y data file name. If a file name is passed to this parameter, the function will use
                       the data in the file.
+    :param header_x: (Integer) - Default is 73. Trace x coordinate's byte position in trace header.
+                     73: source X, 181: X cdp.
+    :param header_y: (Integer) - Default is 77. Trace y coordinate's byte position in trace header.
+                     77: source Y, 185: Y cdp.
+    :param scl_x: (Float) - The trace x coordinates will multiply this parameter.
+                  Default is 1, which means not to scale the trace x coordinates read from trace header.
+                  For example, if scl_x=0.1, the trace x coordinates from trace header will multiply 0.1.
+    :param scl_y: (Float) - The trace y coordinates will multiply this parameter.
+                  Default is 1, which means no to scale the trace y coordinates read from trace header.
+                  For example, if scl_y=0.1, the trace y coordinates from trace header will multiply 0.1.
     :param cube_data: (Numpy.3darray) - The cube data. If a 3D array is passed to this parameter, the function will use
                       this 3D array.
     :param value_name: (String) - Value name of the data.
@@ -312,9 +355,9 @@ def plot_cube(cube_file=None, cube_data=None, value_name=None, colormap='seismic
             x = np.zeros(len(inline), dtype='float32')
             y = np.zeros(len(xline), dtype='float32')
             for i in range(len(inline)):
-                x[i] = f.header[i * len(xline)][73]  # Get trace x coordinates.
+                x[i] = f.header[i * len(xline)][header_x] * scl_x  # Get trace x coordinates.
             for i in range(len(xline)):
-                y[i] = f.header[i][77]  # Get trace y coordinates.
+                y[i] = f.header[i][header_y] * scl_y  # Get trace y coordinates.
             z = f.samples  # Get z coordinate of every trace.
             # Print cube info.
             print('Cube info:')
