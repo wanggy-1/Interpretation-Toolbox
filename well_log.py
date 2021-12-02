@@ -249,20 +249,22 @@ def cross_plot2D(df=None, x=None, y=None, c=None, cmap='rainbow',
     :param ylim: (List of floats) - Default is to infer from data. Range of y-axis, e.g. [0, 150]
     :param show: (Bool) - Default is True. Whether to show the figure.
     """
-    plt.figure()
+    plt.figure(figsize=(13, 9))
     # Set style sheet to bmh.
     plt.style.use('bmh')
     # Set up the scatter plot.
     plt.scatter(x=x, y=y, data=df, c=c, cmap=cmap)
-    plt.xlabel(xlabel, fontsize=14)
-    plt.ylabel(ylabel, fontsize=14)
+    plt.xlabel(xlabel, fontsize=18)
+    plt.ylabel(ylabel, fontsize=18)
+    plt.tick_params(labelsize=16)
     if xlim is not None:
         plt.xlim(xlim[0], xlim[1])
     if ylim is not None:
         plt.ylim(ylim[0], ylim[1])
-    plt.title(title, fontsize=16)
+    plt.title(title, fontsize=20)
     cbar = plt.colorbar()
-    cbar.set_label(colorbar, size=14)
+    cbar.set_label(colorbar, size=18)
+    cbar.ax.tick_params(labelsize=16)
     if show:
         plt.show()
 
@@ -288,7 +290,7 @@ def cross_plot3D(df=None, x=None, y=None, z=None, c=None, cmap='rainbow',
     :param zlim: (List of floats) - Default is to infer from data. Range of z-axis, e.g. [0, 150]
     :param show: (Bool) - Default is True. Whether to show the figure.
     """
-    fig = plt.figure()
+    fig = plt.figure(figsize=(12, 9))
     ax = plt.axes(projection='3d')
     # Get values from data frame.
     xs = df[x].values
@@ -297,18 +299,20 @@ def cross_plot3D(df=None, x=None, y=None, z=None, c=None, cmap='rainbow',
     cs = df[c].values
     # Set up the scatter plot.
     scat = ax.scatter3D(xs, ys, zs, c=cs, cmap=cmap)
-    ax.set_xlabel(xlabel, fontsize=14)
-    ax.set_ylabel(ylabel, fontsize=14)
-    ax.set_zlabel(zlabel, fontsize=14)
+    ax.set_xlabel(xlabel, fontsize=18)
+    ax.set_ylabel(ylabel, fontsize=18)
+    ax.set_zlabel(zlabel, fontsize=18)
+    ax.tick_params(labelsize=14)
     if xlim is not None:
         ax.set_xlim(xlim[0], xlim[1])
     if ylim is not None:
         ax.set_ylim(ylim[0], ylim[1])
     if zlim is not None:
         ax.set_zlim(zlim[0], zlim[1])
-    plt.title(title, fontsize=16)
+    plt.title(title, fontsize=20)
     cbar = fig.colorbar(scat, ax=ax)
-    cbar.set_label(colorbar, size=16)
+    cbar.set_label(colorbar, size=18)
+    cbar.ax.tick_params(labelsize=16)
     if show:
         plt.show()
 
@@ -345,6 +349,7 @@ def plotlog(df=None, depth=None, log=None, fill_log=True, cmap='rainbow',
     ax.invert_yaxis()
     ax.set_xlabel(xlabel, fontsize=14)
     ax.set_ylabel(ylabel, fontsize=14)
+    ax.tick_params(labelsize=13)
     ax.set_title(title, fontsize=16, fontweight='bold')
     if fill_log:
         # Get x axis range.
@@ -392,15 +397,38 @@ def rock_physics(df=None, vp_col=None, vs_col=None, den_col=None,
     return df
 
 
-def cube2well(df=None, x_col=None, y_col=None, z_col=None, cube_file=None, cube_name=None):
+def cube2well(cube_file=None, cube_name=None, header_x=73, header_y=77, scl_x=1, scl_y=1,
+              df=None, x_col=None, y_col=None, z_col=None, well_coord=None,
+              w_x=25.0, w_y=25.0, w_z=2.0):
     """
     Get up-hole trace data from cube and add them to well log data frame.
-    :param df: (Pandas.Dataframe) - Well log data frame, which has to contain x, y and z coordinate column.
+    :param cube_file: (String) - Cube file name. SEG-Y format.
+    :param cube_name: (String) - Cube data name, which will be a new column name in well log data frame.
+    :param header_x: (Integer) - Default is 73. Trace x coordinate's byte position in trace header.
+                     73: source X, 181: X cdp.
+    :param header_y: (Integer) - Default is 77. Trace y coordinate's byte position in trace header.
+                     77: source Y, 185: Y cdp.
+    :param scl_x: (Float) - The trace x coordinates will multiply this parameter.
+                  Default is 1, which means not to scale the trace x coordinates read from trace header.
+                  For example, if scl_x=0.1, the trace x coordinates from trace header will multiply 0.1.
+    :param scl_y: (Float) - The trace y coordinates will multiply this parameter.
+                  Default is 1, which means no to scale the trace y coordinates read from trace header.
+                  For example, if scl_y=0.1, the trace y coordinates from trace header will multiply 0.1.
+    :param df: (Pandas.Dataframe) - Time domain well log data frame, which has to contain x, y and z coordinate column,
+                                    or at least z coordinate column but requires manually input well_coord.
     :param x_col: (String) - X-coordinate column name.
     :param y_col: (String) - Y-coordinate column name.
     :param z_col: (String) - Z-coordinate column name.
-    :param cube_file: (String) - Cube file name. SEG-Y format.
-    :param cube_name: (String) - Cube data name, which will be a new column name in well log data frame.
+    :param well_coord: (List of floats) - Well location coordinates in the form of [well_x, well_y] (e.g. [10.0, 50.0]).
+                       If the well log data frame does not have x and y columns, then all well log samples' coordinates
+                       will be well_coord.
+                       This parameter has no effect when x_col or y_col is not None.
+    :param w_x: (Float) - Default is 25.0. The window's x size in which the well xy coordinates and cube xy coordinates
+                will be matched.
+    :param w_y: (Float) - Default is 25.0. The window's y size in which the well xy coordinates and cube xy coordinates
+                will be matched.
+    :param w_z: (Float) - Default is 2.0. The window's z size in which the well z coordinates and cube z coordinates
+                will be matched.
     :return: df: (Pandas.Dataframe) - Well log data frame with a new column of up-hole trace data from cube.
     """
     # Load cube.
@@ -410,27 +438,46 @@ def cube2well(df=None, x_col=None, y_col=None, z_col=None, cube_file=None, cube_
         x = np.zeros(shape=(f.tracecount,), dtype='float32')  # Initiate trace x-coordinates.
         y = np.zeros(shape=(f.tracecount,), dtype='float32')  # Initiate trace y-coordinates.
         for i in range(f.tracecount):
-            x[i] = f.header[i][73] * 1e-1  # Get x-coordinates from trace header.
-            y[i] = f.header[i][77] * 1e-1  # Get y-coordinates from trace header.
+            x[i] = f.header[i][header_x] * scl_x  # Get x-coordinates from trace header.
+            y[i] = f.header[i][header_y] * scl_y  # Get y-coordinates from trace header.
         x = x.reshape([len(f.ilines), len(f.xlines)], order='C')  # Re-shape x-coordinates array to match the cube.
         y = y.reshape([len(f.ilines), len(f.xlines)], order='C')  # Re-shape y-coordinates array to match the cube.
         t = f.samples  # Get sampling time.
+        print('Cube info:')
+        print('X range: %.2f-%.2f [%d samples]' % (np.amin(x), np.amax(x), len(f.ilines)))
+        print('Y range: %.2f-%.2f [%d samples]' % (np.amin(y), np.amax(y), len(f.xlines)))
+        print('Z range: %.1fms-%.1fms [%d samples]' % (np.amin(t), np.amax(t), len(t)))
     f.close()
     # Get well log's 3D coordinates.
-    well_x = df[x_col].values
-    well_y = df[y_col].values
+    if x_col is None and y_col is None and well_coord is not None:
+        well_x = well_coord[0] * np.ones(len(df))
+        well_y = well_coord[1] * np.ones(len(df))
+    else:
+        well_x = df[x_col].values
+        well_y = df[y_col].values
     well_z = df[z_col].values
+    print('Well info:')
+    print('X range: %.2f-%.2f' % (np.amin(well_x), np.amax(well_x)))
+    print('Y range: %.2f-%.2f' % (np.amin(well_y), np.amax(well_y)))
+    print('Z range: %.1fms-%.1fms [%d samples]' % (np.amin(well_z), np.amax(well_z), len(well_z)))
     # Match well log coordinates with cube data coordinates.
-    dist_map_xy = scipy.spatial.distance.cdist(np.c_[well_x, well_y],
-                                               np.c_[x.ravel(order='C'), y.ravel(order='C')],
-                                               metric='euclidean')  # xy plane distance map.
+    dist_xy = scipy.spatial.distance.cdist(np.c_[well_x, well_y],
+                                           np.c_[x.ravel(order='C'), y.ravel(order='C')],
+                                           metric='euclidean')  # xy plane distance map.
     dist_z = scipy.spatial.distance.cdist(np.reshape(well_z, (-1, 1)),
                                           np.reshape(t, (-1, 1)),
                                           metric='minkowski', p=1)  # z-direction distance.
-    indx, indy = np.unravel_index(np.argmin(dist_map_xy, axis=1), x.shape, order='C')
+    indx, indy = np.unravel_index(np.argmin(dist_xy, axis=1), x.shape, order='C')
     indz = np.argmin(dist_z, axis=1)
+    dist_xy_min = np.amin(dist_xy, axis=1)
+    dist_z_min = np.amin(dist_z, axis=1)
+    ixy = np.squeeze(np.argwhere(dist_xy_min < math.sqrt(w_x ** 2 + w_y ** 2)))
+    iz = np.squeeze(np.argwhere(dist_z_min < w_z))
+    ind = np.intersect1d(ixy, iz)
+    if len(ind) == 0:
+        raise ValueError('The well log has no sample can match the cube, please check the coordinates.')
     # Get data from the cube.
-    df[cube_name] = cube[indx, indy, indz]
+    df.loc[ind, cube_name] = cube[indx[ind], indy[ind], indz[ind]]
     return df
 
 
@@ -499,6 +546,7 @@ def check_info(df=None, log_col='all'):
     table = PrettyTable()
     # Set column names of the table.
     table.field_names = ['Log name', 'Samples', 'Missing', 'Min', 'Max', 'Mean', 'Std']
+    table.float_format = '.2'
     # When log_col is a string...
     if isinstance(log_col, str):
         if log_col == 'all':
