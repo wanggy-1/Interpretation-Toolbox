@@ -340,9 +340,9 @@ for hor in hor_list:
 
     # Create markers.
     marker = horizon_log(df_horizon=df_result[['X', 'Y', 'Z']], df_well_coord=df_well_xy, log_file_path=log_folder,
-                         well_x_col='well_X', well_y_col='well_Y', log_t_col='TWT', log_value_col=target,
+                         log_x_col='well_X', log_y_col='well_Y', log_z_col='TWT', log_value_col=target,
                          log_abnormal_value=-999, sep='\t',
-                         horizon_x_col='X', horizon_y_col='Y', horizon_t_col='Z',
+                         horizon_x_col='X', horizon_y_col='Y', horizon_z_col='Z',
                          print_progress=False)
     if target == 'Litho_Code':  # Binarize lithology codes.
         marker.loc[marker[target] <= 1, target] = 0
@@ -404,9 +404,9 @@ for hor in hor_list:
 
     if plot_marker:
         marker = horizon_log(df_horizon=df_horizon[['X', 'Y', 'Z']], log_file_path=log_folder, df_well_coord=df_well_xy,
-                             sep='\t', well_x_col='well_X', well_y_col='well_Y', log_t_col='TWT',
+                             sep='\t', log_x_col='well_X', log_y_col='well_Y', log_z_col='TWT',
                              log_value_col=target, log_abnormal_value=-999,
-                             horizon_x_col='X', horizon_y_col='Y', horizon_t_col='Z',
+                             horizon_x_col='X', horizon_y_col='Y', horizon_z_col='Z',
                              print_progress=False)
         if binarize:
             marker.loc[marker[target] <= 1, target] = 0
