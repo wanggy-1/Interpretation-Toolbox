@@ -4,10 +4,13 @@ from well_log import *
 
 # The segmented well log file name.
 log_file = '/nfs/opendtect-data/Niuzhuang/Well logs/LithoCodeForPetrel/DK1.txt'
-# Read the segmented well log as data frame.
+
+# Load the segmented well log as data frame.
 df_log = pd.read_csv(log_file, delimiter='\s+')
+
 # Print and check the segmented well log data frame.
 print('Segmented well log data frame:\n', df_log)
+
 # Interpolate the segmented well log data.
 sampling_interval = 0.125  # Well log sampling interval (0.125m), this is also the interpolation step.
 log_col_name = 'Litho_Code'  # Well log column name in df_log.
@@ -17,6 +20,7 @@ bottom_col_name = 'BottomDepth'  # Bottom boundary column name in df_log.
 nominal = True  # Lithology well log data are nominal data.
 df_log_interp = log_interp(df=df_log, step=sampling_interval, log_col=log_col_name, depth_col=depth_col_name,
                            top_col=top_col_name, bottom_col=bottom_col_name, nominal=nominal)
+
 # Print interpolated well log data frame.
 print('Interpolated well log data frame:\n', df_log_interp)
 
@@ -27,16 +31,22 @@ from well_log import *
 
 # Depth-domain well log file name.
 log_file = '/nfs/opendtect-data/Niuzhuang/Well logs/LithoCodeForPetrel-interpolated/DK1_interpolated.txt'
+
 # Depth-time relation file name.
 dt_file = '/nfs/opendtect-data/Niuzhuang/Well logs TD (new)/DK1.txt'
-# Read depth-domain well log as data frame.
+
+# Load depth-domain well log as data frame.
 df_log = pd.read_csv(log_file, delimiter='\t')
-# Read depth-time relation as data frame.
+
+# Load depth-time relation as data frame.
 df_dt = pd.read_csv(dt_file, delimiter='\t')
+
 # Print and check depth-domain well log data frame.
 print('Depth-domain well log data frame:\n', df_log)
+
 # Print and check depth-time relation data frame.
 print('Depth-time relation data frame:\n', df_dt)
+
 # Convert depth-domain well log to time-domain well log.
 time_col_name = 'TWT'  # Time column name in df_dt.
 depth_col_name = 'Depth'  # Depth column name in df_log and df_dt (Two files, same depth column name).
@@ -45,6 +55,7 @@ fill_nan = -999  # There may be NaN after conversion. Fill it with this value (-
 nominal = True  # Lithology well log data are nominal data.
 df_tlog = time_log(df_dt=df_dt, df_log=df_log, time_col=time_col_name, log_depth_col=depth_col_name,
                    dt_depth_col=depth_col_name, log_col=log_col_name, fill_nan=fill_nan, nominal=nominal)
+
 # Print time-domain well log data frame.
 print('Time domain well log data frame:\n', df_tlog)
 
@@ -55,16 +66,22 @@ from well_log import *
 
 # Depth-domain well log file name.
 log_file = '/nfs/opendtect-data/Niuzhuang/Well logs/Por-Perm-Sw/DK1-Por-Perm-Sw.txt'
+
 # Depth-time relation file name.
 dt_file = '/nfs/opendtect-data/Niuzhuang/Well logs TD (new)/DK1.txt'
-# Read depth-domain well log as data frame.
+
+# Load depth-domain well log as data frame.
 df_log = pd.read_csv(log_file, delimiter='\s+')
-# Read depth-time relation as data frame.
+
+# Load depth-time relation as data frame.
 df_dt = pd.read_csv(dt_file, delimiter='\t')
+
 # Print and check depth-domain well log data frame.
 print('Depth-domain well log data frame:\n', df_log)
+
 # Print and check depth-time relation data frame.
 print('Depth-time relation data frame:\n', df_dt)
+
 # Convert depth-domain well log to time-domain well log.
 time_col_name = 'TWT'  # Time column name in df_dt.
 log_depth_col_name = 'DEPTH'  # Depth column name in df_log.
@@ -74,6 +91,7 @@ fill_nan = -999  # There may be NaN after conversion. Fill it with this value (-
 nominal = False  # Porosity, permeability and water-saturation data are numeric data.
 df_tlog = time_log(df_dt=df_dt, df_log=df_log, time_col=time_col_name, log_depth_col=log_depth_col_name,
                    dt_depth_col=dt_depth_col_name, log_col=log_col_name, fill_nan=fill_nan, nominal=nominal)
+
 # Print time-domain well log data frame.
 print('Time domain well log data frame:\n', df_tlog)
 
@@ -84,10 +102,13 @@ from well_log import *
 
 # Time-domain Well log file name.
 log_file = '/nfs/opendtect-data/Niuzhuang/Well logs/LithoCodeForPetrel-time/DK1.txt'
+
 # Read time-domain well log as data frame.
 df_log = pd.read_csv(log_file, delimiter='\t')
+
 # Print and check the well log, especially column names, which will be used in the following function.
 print('Original well log data frame (5000~5099 rows):\n', df_log[5000:5100])
+
 # Re-sample well log by seismic sampling interval (2ms)
 sampling_interval = 2  # 2ms sampling interval.
 depth_col_name = 'TWT'  # Depth column name in df_log.
@@ -97,6 +118,7 @@ abnormal_value = -999  # There may be some abnormal value in original well log d
 nominal = True  # Lithology well log data are nominal data.
 df_log_res = resample_log(df_log=df_log, delta=sampling_interval, depth_col=depth_col_name, log_col=log_col_name,
                           method=resample_method, abnormal_value=abnormal_value, nominal=nominal)
+
 # Print re-sampled well log data frame.
 print('Re-sampled well log data frame (200~299 rows):\n', df_log_res[200:300])
 
@@ -107,10 +129,13 @@ from well_log import *
 
 # Time-domain Well log file name.
 log_file = '/nfs/opendtect-data/Niuzhuang/Well logs/Por-Perm-Sw-time/DK1.txt'
-# Read time-domain well log as data frame.
+
+# Load time-domain well log as data frame.
 df_log = pd.read_csv(log_file, delimiter='\t')
+
 # Print and check the well log, especially column names, which will be used in the following function.
 print('Original well log data frame (5000~5099 rows):\n', df_log[5000:5100])
+
 # Re-sample well log by seismic sampling interval (2ms)
 sampling_interval = 2  # 2ms sampling interval.
 depth_col_name = 'TWT'  # Depth column name in df_log.
@@ -120,6 +145,7 @@ abnormal_value = -999  # There may be some abnormal value in original well log d
 nominal = False  # Porosity, permeability and water-saturation are numeric data.
 df_log_res = resample_log(df_log=df_log, delta=sampling_interval, depth_col=depth_col_name, log_col=log_col_name,
                           method=resample_method, abnormal_value=abnormal_value, nominal=nominal)
+
 # Print re-sampled well log data frame.
 print('Re-sampled well log data frame (210~299 rows):\n', df_log_res[210:300])
 
@@ -131,18 +157,24 @@ from well_log import *
 # Load well logging data.
 file = '/nfs/opendtect-data/Niuzhuang/Well logs/W584.csv'
 df = pd.read_csv(file)
+
 # Choose well logs as x and y coordinates of scatters.
 x = 'GR'  # The column name in df.
 y = 'SP'  # The column name in df.
+
 # Choose well log as colors of scatters.
 c = 'Lith'  # The column name in df.
+
 # Choose a colormap.
 cmap = 'rainbow'
+
 # Define x and y axis name.
 x_name = 'Gamma Ray (GR) - API'
 y_name = 'Spontaneous Potential (SP) - mV'
+
 # Define color bar name.
 cb_name = 'Lithology Code'
+
 # Make cross-plot.
 cross_plot2D(df=df, x=x, y=y, c=c, cmap=cmap, xlabel=x_name, ylabel=y_name, title='W584', colorbar=cb_name)
 
@@ -154,18 +186,23 @@ from well_log import *
 # Load well logging data.
 file = '/nfs/opendtect-data/Niuzhuang/Well logs/W584.csv'
 df = pd.read_csv(file)
+
 # Choose well logs as x, y and z coordinates of scatters.
 x = 'AC'  # The column name in df.
 y = 'DEN'  # The column name in df.
 z = 'SP'  # The column name in df.
+
 # Choose well log as colors of scatters.
 c = 'Lith'  # The column name in df.
+
 # Choose a color map.
 cmap = 'rainbow'
+
 # Define x, y and z axis names.
 x_name = 'Acoustic Compressional - us/m'
 y_name = 'Bulk Density - g/cm3'
 z_name = 'Spontaneous Potential - mV'
+
 # Define color bar name.
 cb_name = 'Lithology Code'
 cross_plot3D(df=df, x=x, y=y, z=z, c=c, cmap=cmap, xlabel=x_name, ylabel=y_name, zlabel=z_name, colorbar=cb_name,
@@ -179,17 +216,44 @@ from well_log import *
 # Load well logging data.
 file = '/nfs/opendtect-data/Niuzhuang/Well logs/W584.csv'
 df = pd.read_csv(file)
+
 # Depth column name.
 depth = 'DEPTH'
+
 # Log column name.
 log = 'POR'
+
 # Choose a color map.
 cmap = 'rainbow'
+
 # Set depth range to visualize.
 ylim = [2400, 2600]
+
 # Define x axis name.
 x_name = 'Porosity - %'
 plotlog(df, depth=depth, log=log, cmap=cmap, ylim=ylim, xlabel='Porosity - %', title='W584', fill_log=True)
+
+
+##
+# Demonstration of getting data from cube to well.
+from well_log import *
+
+# Select a cube file.
+cube_file = '/nfs/opendtect-data/Niuzhuang/Export/seismic_east.sgy'
+
+# Load time domain well log coordinate data as data frame.
+log_file = '/nfs/opendtect-data/Niuzhuang/Well logs/TimeLog/DK1.csv'
+df_log = pd.read_csv(log_file, usecols=['well_X', 'well_Y', 'TWT'])
+
+# Print the well log coordinates data frame.
+print('Well log data coordinates:\n', df_log)
+
+# Get data from cube to well.
+df = cube2well(cube_file=cube_file, cube_name='seismic', scl_x=0.1, scl_y=0.1,
+               df=df_log, x_col='well_X', y_col='well_Y', z_col='TWT')
+
+# Print the result.
+print('Result:\n', df)
 
 
 ##
@@ -250,13 +314,13 @@ df_hor = pd.read_csv(hor_file, delimiter='\t', names=['INLINE', 'XLINE', 'X', 'Y
 
 # Get data from seismic cube file to the horizon.
 df_hor = cube2horizon(df_horizon=df_hor, cube_file=cube_file, hor_x='X', hor_y='Y', hor_il='INLINE',
-                     hor_xl='XLINE', hor_z='Z', match_on='ix', value_name='seismic')
+                      hor_xl='XLINE', hor_z='Z', match_on='ix', value_name='seismic')
 
 # Load well locations as data frame.
 df_well_xy = pd.read_csv(well_xy_file, delimiter='\s+')
 
 # Check the well location data frame.
-print(df_well_xy)
+print('Well location data frame:\n', df_well_xy)
 
 # The log to be marked on the horizon are lithology codes, so we need to create a segmented colormap.
 labels = ['mudstone', 'lime-mudstone', 'siltstone', 'sandstone', 'gravel-sandstone']  # Lithology names.
@@ -266,9 +330,9 @@ cm = LinearSegmentedColormap.from_list('custome', marker_colors, len(marker_colo
 
 # Create markers.
 marker = horizon_log(df_horizon=df_hor[['X', 'Y', 'Z']], log_file_path=log_folder, df_well_coord=df_well_xy,
-                     sep='\t', well_x_col='well_X', well_y_col='well_Y', log_t_col='TWT',
+                     log_x_col='well_X', log_y_col='well_Y', log_z_col='TWT', well_name_col='well_name',
                      log_value_col='Litho_Code', log_abnormal_value=-999,
-                     horizon_x_col='X', horizon_y_col='Y', horizon_t_col='Z',
+                     horizon_x_col='X', horizon_y_col='Y', horizon_z_col='Z',
                      print_progress=True)
 
 # Visualize the horizon.
@@ -287,7 +351,7 @@ from matplotlib.colors import LinearSegmentedColormap
 # Inputs.
 hor_list = ['z1', 'z2']  # Horizons on which to interpolate.
 hor_x, hor_y, hor_z = 'X', 'Y', 'Z'  # 3D coordinates names of horizons.
-well_x, well_y, well_z = 'well_X', 'well_Y', 'TWT'  # Well log z coordinate name.
+log_x, log_y, log_z = 'well_X', 'well_Y', 'TWT'  # Well log coordinate names.
 log_abnormal = -999  # Abnormal value in well log.
 feature_list = ['gailv_sp', 'seismic']  # Features which are used to control the interpolation.
 weight = [1, 1, 1, 1, 1]  # Weight of [x, y, z, feature1, feature2].
@@ -309,8 +373,8 @@ for hor in hor_list:
     df_hor = pd.read_csv(os.path.join(hor_folder, hor + hor_suffix), delimiter='\t',
                          usecols=[hor_x, hor_y, hor_z] + feature_list)
     control = horizon_log(df_horizon=df_hor[[hor_x, hor_y, hor_z]], df_well_coord=df_well_xy, log_file_path=log_folder,
-                          sep='\t', well_x_col=well_x, well_y_col=well_y, log_t_col=well_z,
-                          horizon_x_col=hor_x, horizon_y_col=hor_y, horizon_t_col=hor_z,
+                          log_x_col=log_x, log_y_col=log_y, log_z_col=log_z, well_name_col='well_name',
+                          horizon_x_col=hor_x, horizon_y_col=hor_y, horizon_z_col=hor_z,
                           log_value_col=target, log_abnormal_value=log_abnormal)
     df_itp, _ = FSDI_horizon(df_horizon=df_hor, df_control=control, coord_col=[hor_x, hor_y, hor_z],
                              feature_col=feature_list, log_col=target, weight=weight)
@@ -333,8 +397,12 @@ for hor in hor_list:
 ##
 # Demonstration of using FSDI to interpolate lithology between horizons.
 from horizon import *
+from cube import plot_cube
 
-seis_file = '/nfs/opendtect-data/Niuzhuang/Export/seismic_east.sgy'
+# Select a feature file.
+feature_file = '/nfs/opendtect-data/Niuzhuang/Export/seismic_east.sgy'
+
+# Select horizon files.
 hor_file = ['/nfs/opendtect-data/Niuzhuang/Export/T4_east_dense.dat',
             '/nfs/opendtect-data/Niuzhuang/Export/z1_east_dense.dat',
             '/nfs/opendtect-data/Niuzhuang/Export/z2_east_dense.dat',
@@ -343,43 +411,77 @@ hor_file = ['/nfs/opendtect-data/Niuzhuang/Export/T4_east_dense.dat',
             '/nfs/opendtect-data/Niuzhuang/Export/z5_east_dense.dat',
             '/nfs/opendtect-data/Niuzhuang/Export/z6_east_dense.dat',
             '/nfs/opendtect-data/Niuzhuang/Export/T6_east_dense.dat']
+
+# Select a folder of well log files.
 log_folder = '/nfs/opendtect-data/Niuzhuang/Well logs/LithoCodeForPetrel-time'
+
+# The well log files contain no well locations, so we need to get well location coordinates from another file.
 well_loc_file = '/nfs/opendtect-data/Niuzhuang/Well logs/well_locations.prn'
-output_file = '/nfs/opendtect-data/Niuzhuang/Litho_Code_11.txt'
-FSDI_interhorizon(seis_file=seis_file, seis_name='seis_amp',
-                  horizon_file=hor_file, horizon_col=['x', 'y', 'inline', 'xline', 't'],
-                  log_dir=log_folder, log_value_col='Litho_Code',
-                  well_loc_file=well_loc_file,
-                  dp=None, fill_value=-1, init_value=1e30,
-                  output_file=output_file,
-                  tight_frame=True)
+df_well_loc = pd.read_csv(well_loc_file, delimiter='\s+')
+
+# Input parameters.
+feature_name = 'seismic'  # Feature name.
+hor_col = ['x', 'y', 'inline', 'xline', 't']  # Column names of horizon files.
+hor_x, hor_y, hor_z = 'x', 'y', 't'  # Horizon coordinates column names.
+log_x, log_y, log_z, log_v = 'well_X', 'well_Y', 'TWT', 'Litho_Code'  # Well log coordinates and value column names.
+well_name_col = 'well_name'  # Well name column name in well location data frame df_well_loc.
+log_abnormal = -999  # Abnormal value in well logs.
+
+# Apply FSDI in inter-horizon layers.
+result = FSDI_interhorizon(feature_file=feature_file, feature_name=feature_name, scl_x=0.1, scl_y=0.1,
+                           horizon_file=hor_file, horizon_col=hor_col, horizon_x_col=hor_x, horizon_y_col=hor_y,
+                           horizon_z_col=hor_z, log_dir=log_folder, log_x_col=log_x, log_y_col=log_y, log_z_col=log_z,
+                           log_value_col=log_v, df_well_loc=df_well_loc, well_name_col=well_name_col,
+                           fill_value=-1, init_value=1e30, log_abnormal=log_abnormal,
+                           tight_frame=True)
+
+# Visualize the interpolation result.
+cm = ['white', 'grey', 'limegreen', 'cyan', 'gold', 'darkviolet']
+plot_cube(cube_data=result, value_name='Litho_Code', colormap=cm, scale=[2, 2, 1])
 
 
 ##
 # Demonstration of using FSDI to interpolate lithology in cube.
 from cube import *
 
-multi_file = False
+# Select features.
+multi_file = False  # True if multiple features, and False if single feature.
 if multi_file:
-    seismic_file = ['/nfs/opendtect-data/Niuzhuang/Export/seismic_east.sgy',
+    feature_file = ['/nfs/opendtect-data/Niuzhuang/Export/seismic_east.sgy',
                     '/nfs/opendtect-data/Niuzhuang/Export/vpvs_east.sgy',
-                    '/nfs/opendtect-data/Niuzhuang/Export/sp_east.sgy']
+                    '/nfs/opendtect-data/Niuzhuang/Export/sp_east.sgy']  # These are feature files.
 else:
-    seismic_file = '/nfs/opendtect-data/Niuzhuang/Export/seismic_east.sgy'
-log_dir = '/nfs/opendtect-data/Niuzhuang/Well logs/LithoCodeForPetrel-time'  # Well log directory.
-well_location_file = '/nfs/opendtect-data/Niuzhuang/Well logs/well_locations.prn'  # Well location file.
-weight = [5, 5, 5, 1]
-log_name = 'Litho_Code'
-depth_name = 'TWT'
-coord_name = ['X', 'Y']
+    feature_file = '/nfs/opendtect-data/Niuzhuang/Export/seismic_east.sgy'  # This is the feature file.
+
+# Well log file folder.
+log_dir = '/nfs/opendtect-data/Niuzhuang/Well logs/LithoCodeForPetrel-time'
+
+# Well location file.
+well_location_file = '/nfs/opendtect-data/Niuzhuang/Well logs/well_locations.prn'
+
+# Input weights of space and features.
 if multi_file:
-    seis_name = ['SeisAmp', 'VpVs', 'SP']
+    weight = [1, 1, 1, 5, 5, 5]  # Weight of [x, y, z, feature1, feature2, feature3]
 else:
-    seis_name = 'SeisAmp'
-output_file = '/nfs/opendtect-data/Niuzhuang/Litho_Code_8.txt'
-well_name_loc = 'well_name'
-coord_name_loc = ['well_X', 'well_Y']
-result = FSDI_cube(seismic_file=seismic_file, log_dir=log_dir, output_file=output_file, weight=weight,
+    weight = [1, 1, 1, 5]  # Weight of [x, y, z, feature1]
+
+# Some other inputs.
+log_name = 'Litho_Code'  # Log data to be interpolated.
+depth_name = 'TWT'  # Well log depth column name.
+coord_name = ['well_X', 'well_Y']  # Coordinate column name in well location file.
+well_name_loc = 'well_name'  # Well name column name in well location file.
+if multi_file:
+    feature_name = ['SeisAmp', 'VpVs', 'SP']  # Feature names.
+else:
+    feature_name = 'SeisAmp'  # Feature name.
+log_abnormal = -999
+
+# FSDI interpolation.
+result = FSDI_cube(feature_file=feature_file, log_dir=log_dir, weight=weight, scl_x=0.1, scl_y=0.1,
                    resample_method='most_frequent', log_name=log_name, depth_name=depth_name, coord_name=coord_name,
-                   seis_name=seis_name,  well_location_file=well_location_file,
-                   well_name_loc=well_name_loc, coord_name_loc=coord_name_loc)
+                   feature_name=feature_name,  well_location_file=well_location_file, abnormal_value=log_abnormal,
+                   well_name_loc=well_name_loc)
+
+# Visualize interpolation result.
+cm = ['grey', 'limegreen', 'cyan', 'gold', 'darkviolet']
+plot_cube(cube_data=np.squeeze(result), value_name=log_name, colormap=cm, scale=[6, 6, 1])
