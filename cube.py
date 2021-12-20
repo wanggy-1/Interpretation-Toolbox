@@ -285,13 +285,15 @@ def FSDI_cube(feature_file=None, feature_name=None, header_x=73, header_y=77, sc
     return cube_itp
 
 
-def plot_cube(cube_file=None, header_x=73, header_y=77, scl_x=1, scl_y=1,
-              cube_data=None, value_name=None, colormap='seismic', on='xy', scale=None,
+def plot_cube(p=None, cube_file=None, header_x=73, header_y=77, scl_x=1, scl_y=1, cube_data=None, value_name=None,
+              fig_name=None, colormap='seismic', on='xy', scale=None,
               hor_list=None, hor_sep='\t', hor_header=None, hor_col_names=None,
               hor_x=None, hor_y=None, hor_il=None, hor_xl=None, hor_z=None, hor_xwin=None, hor_ywin=None, hor_zwin=2.0,
               show_slice=True, show_axes=True):
     """
     Visualize cube data and horizon data in the same time.
+    :param p: (pyvista.Plotter) - Default is None, which is to create a new plotter. Can also accept a plotter from
+              outside.
     :param cube_file: (String) - SEG-Y data file name. If a file name is passed to this parameter, the function will use
                       the data in the file.
     :param header_x: (Integer) - Default is 73. Trace x coordinate's byte position in trace header.
@@ -307,6 +309,7 @@ def plot_cube(cube_file=None, header_x=73, header_y=77, scl_x=1, scl_y=1,
     :param cube_data: (Numpy.3darray) - The cube data. If a 3D array is passed to this parameter, the function will use
                       this 3D array.
     :param value_name: (String) - Value name of the data.
+    :param fig_name: (String) - Figure name.
     :param colormap: (String) - Default is 'seismic'. The color map used to visualize the cube data.
     :param on: (String) - Default is 'xy'. Options are 'xy' and 'ix'.
                           If 'xy', the function will use trace coordinates as xy coordinates.
@@ -384,8 +387,11 @@ def plot_cube(cube_file=None, header_x=73, header_y=77, scl_x=1, scl_y=1,
         print('Z Range: [%d-%d] [%d samples]' % (z[0], z[-1], len(z)))
         on = 'xy'
     # Initiate plotter.
-    pv.set_plot_theme('ParaView')
-    p = BackgroundPlotter(lighting='three lights')
+    flag = 0
+    if p is None:
+        pv.set_plot_theme('ParaView')
+        p = BackgroundPlotter()
+        flag += 1
     sargs = dict(height=0.5, vertical=True, position_x=0.85, position_y=0.2,
                  label_font_size=14, title_font_size=18)  # The scalar bar arguments.
     # Plot the cube.
@@ -483,6 +489,8 @@ def plot_cube(cube_file=None, header_x=73, header_y=77, scl_x=1, scl_y=1,
                 hor_grid.scale(scale)  # Scale the grid.
             hor_grid[value_name] = np.ravel(v_hor, order='F')  # Map horizon data to the grid.
             p.add_mesh(hor_grid, scalars=value_name, cmap=colormap)
+    if fig_name is not None:
+        p.add_text(fig_name, font_size=18)
     if on == 'ix':
         p.add_axes(xlabel='Inline', ylabel='Xline')  # Add an interactive axes widget in the bottom left corner.
     else:
@@ -492,4 +500,5 @@ def plot_cube(cube_file=None, header_x=73, header_y=77, scl_x=1, scl_y=1,
             p.show_bounds(xlabel='X', ylabel='Y', zlabel='Z')
         elif on == 'ix':
             p.show_bounds(xlabel='Inline', ylabel='Xline', zlabel='Z')
-    p.app.exec_()  # Show all figures.
+    if flag == 1:
+        p.app.exec_()  # Show all figures.
