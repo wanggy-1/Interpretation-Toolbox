@@ -485,3 +485,41 @@ result = FSDI_cube(feature_file=feature_file, log_dir=log_dir, weight=weight, sc
 # Visualize interpolation result.
 cm = ['grey', 'limegreen', 'cyan', 'gold', 'darkviolet']
 plot_cube(cube_data=np.squeeze(result), value_name=log_name, colormap=cm, scale=[6, 6, 1])
+
+
+##
+# Use agglomerative clustering to cluster seismic attributes.
+from machine_learning import *
+from horizon import *
+from matplotlib.colors import LinearSegmentedColormap
+
+# Parameters.
+file = '/nfs/opendtect-data/Niuzhuang/Export/z1-features-clustering.dat'  # Feature file name.
+n_clusters = 2  # The number of clusters.
+cmap_color = ['gray', 'gold']  # Colors of the clustering result.
+labels = ['0', '1']  # Label names of the clustering result.
+class_code = [0, 1]  # Label codes of the clustering result.
+coord_name = ['X', 'Y']  # Coordinate column names.
+selected_features = ['sp', 'vpvs', 'Spectrum-70Hz', 'Absorb Q', 'Spectrum-60Hz']  # Choose features.
+
+# Get features.
+df = pd.read_csv(file, delimiter='\t')
+df_feature = df[selected_features]
+df_coord = df[coord_name]
+
+# Agglomerative clustering.
+df_out, _, _ = agglomerative_clustering(df_feature=df_feature, n_cluster=2, affinity='euclidean', linkage='ward')
+df_result = pd.concat([df_coord, df_out], axis=1)
+
+# Visualize the clustering result.
+cm = LinearSegmentedColormap.from_list('custom', cmap_color, len(cmap_color))
+visualize_horizon(df=df_result, x_name='X', y_name='Y', value_name='class', cmap=cm, nominal=True,
+                  class_code=class_code, class_label=labels, vmin=min(class_code), vmax=max(class_code),
+                  fig_name='Clustering Result', show=False)
+
+# Visualize features.
+for feature in selected_features:
+    visualize_horizon(df=df_result, x_name='X', y_name='Y', value_name=feature, nominal=False, fig_name=feature,
+                      show=False)
+
+plt.show()
