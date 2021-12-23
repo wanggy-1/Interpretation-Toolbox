@@ -1,11 +1,14 @@
+import time
+import warnings
+import sys
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-import warnings
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.feature_selection import RFE, RFECV
+from sklearn.cluster import AgglomerativeClustering
 
 
 def high_cor_filter(df=None, threshold=0.9, cor_method='pearson', cor_vis=False, cmap='Reds', annot=True, fmt='.2f',
@@ -155,3 +158,45 @@ def feature_selection(df=None, feature_col=None, target_col=None, random_state=N
         if show:
             plt.show()
     return df_out, df_rank, df_importance
+
+
+def agglomerative_clustering(df_feature=None, n_cluster=2, affinity='euclidean', linkage='ward', **kwargs):
+    """
+    Use agglomerative clustering to cluster features.
+    :param df_feature: (Pandas.Dataframe) - Feature dataframe.
+    :param n_cluster: (Integer) - The number of clusters to find. It must be None if distance_threshold is not None.
+    :param affinity: (String) - Default is 'euclidean'. Metric used to compute the linkage. Can be 'euclidean', 'l1',
+                     'l2', 'manhattan', 'cosine', or 'precomputed'. If linkage is 'ward', only 'euclidean' is accepted.
+                     If 'precomputed', a distance matrix (instead of a similarity matrix) is needed as input for the
+                     fit method.
+    :param linkage: (String) - Default is 'ward'. Which linkage criterion to use.The linkage criterion determines which
+                    distance to use between sets of observation. The algorithm will merge the pairs of cluster that
+                    minimize this criterion.
+                    Options are 'ward', 'complete', 'average', 'single'.
+                    'ward' minimizes the variance of the clusters being merged.
+                    'average' uses the average of the distances of each observation of the two sets.
+                    'complete' or 'maximum' linkage uses the maximum distances between all observations of the two sets.
+                    'single' uses the minimum of the distances between all observations of the two sets.
+    :param kwargs: (Dictionary) - Keyword parameters of function AgglomerativeClustering from scikit-learn.
+                   https://scikit-learn.org/stable/modules/generated/sklearn.cluster.AgglomerativeClustering.html#sklearn.cluster.AgglomerativeClustering
+    :return: df_out: (Pandas.DataFrame) - Features and cluster labels. The cluster label column name is 'class'.
+             y: (Numpy.1darray) - Cluster labels.
+             clustering: (Object) - The fitted instance of AgglomerativeClustering.
+    """
+    t1 = time.perf_counter()  # Timer.
+    # Get features as array.
+    x = df_feature.values
+    # Scale all features to 0 and 1.
+    scaler = MinMaxScaler()
+    x = scaler.fit_transform(x)
+    # Start clustering.
+    sys.stdout.write('Clustering...')
+    clustering = AgglomerativeClustering(n_clusters=n_cluster, affinity=affinity, linkage=linkage, **kwargs)
+    y = clustering.fit_predict(x)
+    sys.stdout.write('Done\n')
+    # Output.
+    df_out = df_feature.copy()
+    df_out['class'] = y
+    t2 = time.perf_counter()
+    print('Process time: %.2fs' % (t2 - t1))
+    return df_out, y, clustering
