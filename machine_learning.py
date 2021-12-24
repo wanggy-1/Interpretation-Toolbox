@@ -180,7 +180,6 @@ def agglomerative_clustering(df_feature=None, n_cluster=2, affinity='euclidean',
     :param kwargs: (Dictionary) - Keyword parameters of function AgglomerativeClustering from scikit-learn.
                    https://scikit-learn.org/stable/modules/generated/sklearn.cluster.AgglomerativeClustering.html#sklearn.cluster.AgglomerativeClustering
     :return: df_out: (Pandas.DataFrame) - Features and cluster labels. The cluster label column name is 'class'.
-             y: (Numpy.1darray) - Cluster labels.
              clustering: (Object) - The fitted instance of AgglomerativeClustering.
     """
     t1 = time.perf_counter()  # Timer.
@@ -199,4 +198,4 @@ def agglomerative_clustering(df_feature=None, n_cluster=2, affinity='euclidean',
     df_out['class'] = y
     t2 = time.perf_counter()
     print('Process time: %.2fs' % (t2 - t1))
-    return df_out, y, clustering
+    return df_out, clustering
