@@ -59,7 +59,8 @@ def high_cor_filter(df=None, threshold=0.9, cor_method='pearson', cor_vis=False,
     # Filter out features which are highly correlated with another feature.
     cor_u = cor.where(np.triu(np.ones(cor.shape), k=1).astype(bool))  # The correlation matrix is symmetrical.
     drop_col = [col for col in cor_u.columns if any(cor_u[col] > threshold)]  # Columns with correlation > threshold.
-    print('Removed features:\n', drop_col)
+    print('%d features are removed by HCF' % len(drop_col))
+    print(drop_col)
     df_new.drop(columns=drop_col, inplace=True)  # In this data frame all features are scaled to 0~1.
     df.drop(columns=drop_col, inplace=True)  # This is the original data frame with unscaled features.
     # If cor_vis is True, visualize correlation matrix after dropping out features with high correlation.
@@ -101,8 +102,9 @@ def feature_selection(df=None, feature_col=None, target_col=None, random_state=N
                                  Only used when auto is False. If None, half of the features are selected.
                                  If integer, the parameter is the absolute number of features to select.
                                  If float between 0 and 1, it is the fraction of features to select.
-    :param show: (Bool) - Default is True. Whether to show the cross-validation accuracy curve. Only used when RFECV is
-                 used.
+    :param show: (Bool) - Default is True.
+                 Whether to show the feature rank, feature importance and cross-validation (CV) accuracy curve.
+                 To show CV accuracy curve, RFECV must be used.
     :return: df_out: (Pandas.Dataframe) - Data frame with selected features and the target variable.
              df_rank: (Pandas.Dataframe) - The ranking of all features.
              df_importance: (Pandas.Dataframe) - The importance of selected features.
@@ -127,18 +129,20 @@ def feature_selection(df=None, feature_col=None, target_col=None, random_state=N
     # Fit selector with features and target.
     selector.fit(x, y)
     # Print selected features.
-    print('%d features are selected:' % selector.n_features_)
-    selected_feature = selector.get_feature_names_out()
+    print('%d features are selected by RFE:' % selector.n_features_)
+    selected_feature = list(selector.get_feature_names_out())
     print(selected_feature)
     # Print the feature rank.
     df_rank = pd.DataFrame({'Rank': selector.ranking_}, index=selector.feature_names_in_)
     df_rank.sort_values(by=['Rank'], inplace=True)
-    print('The rank of all features:\n', df_rank)
+    if show:
+        print('The rank of all features:\n', df_rank)
     # Print feature importance.
     feature_importance = selector.estimator_.feature_importances_
     df_importance = pd.DataFrame({'Importance': feature_importance}, index=selected_feature)
     df_importance.sort_values(by=['Importance'], ascending=False, inplace=True)
-    print('Feature importance:\n', df_importance)
+    if show:
+        print('Feature importance:\n', df_importance)
     # Dataframe with selected features.
     df_out = pd.DataFrame(selector.transform(x), columns=selected_feature)
     df_out[target_col] = df[target_col].values
