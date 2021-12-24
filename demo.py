@@ -488,7 +488,59 @@ plot_cube(cube_data=np.squeeze(result), value_name=log_name, colormap=cm, scale=
 
 
 ##
-# Use agglomerative clustering to cluster seismic attributes (64GB RAM required).
+# Demonstration of feature selection.
+import os
+from well_log import *
+from machine_learning import *
+
+target = 'Lith'  # Select a target.
+threshold = 0.9  # Threshold of high correlation filter.
+auto = True  # If True, will use RFECV, if false will use RFE.
+n_feature = 5  # Desired number of features. Only used when auto is False.
+
+# Assemble data from all available wells.
+folder = '/nfs/opendtect-data/Niuzhuang/Well logs/TimeLog'
+df_in = pd.DataFrame()
+for file in os.listdir(folder):
+    df_temp = pd.read_csv(os.path.join(folder, file))
+    df_in = df_in.append(df_temp, ignore_index=True)
+
+# Create feature dataframe.
+rm_col = ['TWT', 'well_X', 'well_Y', 'MicroFacies', 'Lith', 'Res', 'POR', 'PERM', 'SW', 'DEN', 'GR']
+df_feature = df_in.drop(columns=rm_col)
+print('Dataset:\n', df_in)
+print('Dataset info:')
+check_info(df_in, log_col=list(df_in.columns))
+
+# Replace outliers with NaN.
+cond = {'AC': [130, None], 'Vp': [None, 8], 'Vs': [None, 7], 'Ip': [None, 22], 'Is': [None, 20],
+        'Bulk Modulus': [0, None]}
+df_feature = outlier_filter(df_feature, condition=cond, delete_inf=True, delete_none=True, remove_row=False)
+
+# Filter features which are highly correlated to other features.
+df_feature = high_cor_filter(df=df_feature, threshold=threshold, annot=True, axis_tick_size=12, cbar_tick_size=14,
+                             cbar_label_size=16, title_size=20, cor_vis=False)
+feature = list(df_feature.columns)
+
+# Create dataframe with features and the target.
+df = pd.concat([df_feature, df_in[target]], axis=1)
+
+# Remove missing values.
+df.dropna(axis='index', how='any', inplace=True)
+
+# Select features through recursive feature elimination.
+df, _, _ = feature_selection(df=df, feature_col=feature, target_col=target,
+                             estimator_type='classifier',
+                             auto=auto, random_state=0, show=False)
+print('Dataset after feature selection:\n', df)
+print('Dataset info:')
+check_info(df, log_col=list(df.columns))
+
+plt.show()
+
+
+##
+# Demonstration of using agglomerative clustering to cluster seismic attributes (64GB RAM required).
 from machine_learning import *
 from horizon import *
 from matplotlib.colors import LinearSegmentedColormap
