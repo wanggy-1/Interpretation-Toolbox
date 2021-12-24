@@ -488,7 +488,7 @@ plot_cube(cube_data=np.squeeze(result), value_name=log_name, colormap=cm, scale=
 
 
 ##
-# Use agglomerative clustering to cluster seismic attributes.
+# Use agglomerative clustering to cluster seismic attributes (64GB RAM required).
 from machine_learning import *
 from horizon import *
 from matplotlib.colors import LinearSegmentedColormap
