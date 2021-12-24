@@ -508,7 +508,7 @@ df_feature = df[selected_features]
 df_coord = df[coord_name]
 
 # Agglomerative clustering.
-df_out, _, _ = agglomerative_clustering(df_feature=df_feature, n_cluster=2, affinity='euclidean', linkage='ward')
+df_out, _ = agglomerative_clustering(df_feature=df_feature, n_cluster=2, affinity='euclidean', linkage='ward')
 df_result = pd.concat([df_coord, df_out], axis=1)
 
 # Visualize the clustering result.
