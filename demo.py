@@ -485,3 +485,93 @@ result = FSDI_cube(feature_file=feature_file, log_dir=log_dir, weight=weight, sc
 # Visualize interpolation result.
 cm = ['grey', 'limegreen', 'cyan', 'gold', 'darkviolet']
 plot_cube(cube_data=np.squeeze(result), value_name=log_name, colormap=cm, scale=[6, 6, 1])
+
+
+##
+# Demonstration of feature selection.
+import os
+from well_log import *
+from machine_learning import *
+
+target = 'Lith'  # Select a target.
+threshold = 0.9  # Threshold of high correlation filter.
+auto = True  # If True, will use RFECV, if false will use RFE.
+n_feature = 5  # Desired number of features. Only used when auto is False.
+
+# Assemble data from all available wells.
+folder = '/nfs/opendtect-data/Niuzhuang/Well logs/TimeLog'
+df_in = pd.DataFrame()
+for file in os.listdir(folder):
+    df_temp = pd.read_csv(os.path.join(folder, file))
+    df_in = df_in.append(df_temp, ignore_index=True)
+
+# Create feature dataframe.
+rm_col = ['TWT', 'well_X', 'well_Y', 'MicroFacies', 'Lith', 'Res', 'POR', 'PERM', 'SW', 'DEN', 'GR']
+df_feature = df_in.drop(columns=rm_col)
+print('Dataset:\n', df_in)
+print('Dataset info:')
+check_info(df_in, log_col=list(df_in.columns))
+
+# Replace outliers with NaN.
+cond = {'AC': [130, None], 'Vp': [None, 8], 'Vs': [None, 7], 'Ip': [None, 22], 'Is': [None, 20],
+        'Bulk Modulus': [0, None]}
+df_feature = outlier_filter(df_feature, condition=cond, delete_inf=True, delete_none=True, remove_row=False)
+
+# Filter features which are highly correlated to other features.
+df_feature = high_cor_filter(df=df_feature, threshold=threshold, annot=True, axis_tick_size=12, cbar_tick_size=14,
+                             cbar_label_size=16, title_size=20, cor_vis=False)
+feature = list(df_feature.columns)
+
+# Create dataframe with features and the target.
+df = pd.concat([df_feature, df_in[target]], axis=1)
+
+# Remove missing values.
+df.dropna(axis='index', how='any', inplace=True)
+
+# Select features through recursive feature elimination.
+df, _, _ = feature_selection(df=df, feature_col=feature, target_col=target,
+                             estimator_type='classifier',
+                             auto=auto, random_state=0, show=False)
+print('Dataset after feature selection:\n', df)
+print('Dataset info:')
+check_info(df, log_col=list(df.columns))
+
+plt.show()
+
+
+##
+# Demonstration of using agglomerative clustering to cluster seismic attributes (64GB RAM required).
+from machine_learning import *
+from horizon import *
+from matplotlib.colors import LinearSegmentedColormap
+
+# Parameters.
+file = '/nfs/opendtect-data/Niuzhuang/Export/z1-features-clustering.dat'  # Feature file name.
+n_clusters = 2  # The number of clusters.
+cmap_color = ['gray', 'gold']  # Colors of the clustering result.
+labels = ['0', '1']  # Label names of the clustering result.
+class_code = [0, 1]  # Label codes of the clustering result.
+coord_name = ['X', 'Y']  # Coordinate column names.
+selected_features = ['sp', 'vpvs', 'Spectrum-70Hz', 'Absorb Q', 'Spectrum-60Hz']  # Choose features.
+
+# Get features.
+df = pd.read_csv(file, delimiter='\t')
+df_feature = df[selected_features]
+df_coord = df[coord_name]
+
+# Agglomerative clustering.
+df_out, _ = agglomerative_clustering(df_feature=df_feature, n_cluster=2, affinity='euclidean', linkage='ward')
+df_result = pd.concat([df_coord, df_out], axis=1)
+
+# Visualize the clustering result.
+cm = LinearSegmentedColormap.from_list('custom', cmap_color, len(cmap_color))
+visualize_horizon(df=df_result, x_name='X', y_name='Y', value_name='class', cmap=cm, nominal=True,
+                  class_code=class_code, class_label=labels, vmin=min(class_code), vmax=max(class_code),
+                  fig_name='Clustering Result', show=False)
+
+# Visualize features.
+for feature in selected_features:
+    visualize_horizon(df=df_result, x_name='X', y_name='Y', value_name=feature, nominal=False, fig_name=feature,
+                      show=False)
+
+plt.show()
