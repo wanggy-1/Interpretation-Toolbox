@@ -492,11 +492,13 @@ plot_cube(cube_data=np.squeeze(result), value_name=log_name, colormap=cm, scale=
 import os
 from well_log import *
 from machine_learning import *
+from sklearn.ensemble import RandomForestClassifier
 
 target = 'Lith'  # Select a target.
 threshold = 0.9  # Threshold of high correlation filter.
 auto = True  # If True, will use RFECV, if false will use RFE.
-n_feature = 5  # Desired number of features. Only used when auto is False.
+n_feature = 1  # When use RFECV, it is the minimum number of feature. When use RFE, it is the desired number of feature.
+random_state = 0  # Control the random state for reproduction.
 
 # Assemble data from all available wells.
 folder = '/nfs/opendtect-data/Niuzhuang/Well logs/TimeLog'
@@ -528,10 +530,12 @@ df = pd.concat([df_feature, df_in[target]], axis=1)
 # Remove missing values.
 df.dropna(axis='index', how='any', inplace=True)
 
+# Initialize estimator.
+RFC = RandomForestClassifier(random_state=random_state)
+
 # Select features through recursive feature elimination.
-df, _, _ = feature_selection(df=df, feature_col=feature, target_col=target,
-                             estimator_type='classifier',
-                             auto=auto, random_state=0, show=False)
+df, _, _ = feature_selection(df=df, feature_col=feature, target_col=target, estimator=RFC, auto=auto,
+                             feature_to_select=n_feature, show=False)
 print('Dataset after feature selection:\n', df)
 print('Dataset info:')
 check_info(df, log_col=list(df.columns))
