@@ -390,7 +390,7 @@ def plot_cube(p=None, cube_file=None, header_x=73, header_y=77, scl_x=1, scl_y=1
     flag = 0
     if p is None:
         pv.set_plot_theme('ParaView')
-        p = BackgroundPlotter()
+        p = BackgroundPlotter(lighting='three lights')
         flag += 1
     sargs = dict(height=0.5, vertical=True, position_x=0.85, position_y=0.2,
                  label_font_size=14, title_font_size=18)  # The scalar bar arguments.
