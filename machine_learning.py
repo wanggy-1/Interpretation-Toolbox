@@ -6,7 +6,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.feature_selection import RFE, RFECV
 from sklearn.cluster import AgglomerativeClustering
 
@@ -80,8 +79,8 @@ def high_cor_filter(df=None, threshold=0.9, cor_method='pearson', cor_vis=False,
     return df
 
 
-def feature_selection(df=None, feature_col=None, target_col=None, random_state=None, estimator_type='classifier',
-                      auto=True, n_features_to_select=None, show=True):
+def feature_selection(df=None, feature_col=None, target_col=None, estimator=None, auto=True, feature_to_select=None,
+                      show=True, **kwargs):
     """
     Select most informative features by recursive feature elimination (RFE) or RFE in a cross-validation loop (RFECV).
     https://scikit-learn.org/stable/modules/feature_selection.html#rfe
@@ -92,40 +91,39 @@ def feature_selection(df=None, feature_col=None, target_col=None, random_state=N
     :param df: (Pandas.Dataframe) - Data frame that contains features and the target variable.
     :param feature_col: (List of strings or string) - Feature column names in df.
     :param target_col: (String) - Target variable column name in df.
-    :param random_state: (Integer or None) - Default is 0. The random number seed. If None, will produce different
-                         results in different calls. If integer, will produce same results in different calls.
-    :param estimator_type: (String) - Default is 'classifier'. The estimator type, 'classifier' to use the Random
-                           Forests classifier and 'regressor' to use the Random Forests regressor.
+    :param estimator: (Estimator instance) - A supervised learning estimator with a fit method that provides information
+                      about feature importance.
     :param auto: (Bool) - Default is True. Whether to automatically select the optimal number of features. If true, will
-                 use the RFECV, otherwise will use the RFE and require to input the disired number of selected features.
-    :param n_features_to_select: (Integer, float or None) - Default is None. The number of features to select.
-                                 Only used when auto is False. If None, half of the features are selected.
-                                 If integer, the parameter is the absolute number of features to select.
-                                 If float between 0 and 1, it is the fraction of features to select.
+                 use the RFECV, otherwise will use the RFE and require to input the desired number of selected features.
+    :param feature_to_select: (Integer, float or None) - The number of features to select.
+                              When auto is True, will use RFECV, and this parameter will be the minimum number of
+                              features to be selected. Default is 1.
+                              When auto is False, will use RFE, and this parameter will be the number of features to
+                              select. Default is half of the features.
+                              If integer, the parameter is the absolute number of features to select.
+                              If float between 0 and 1, it is the fraction of features to select.
     :param show: (Bool) - Default is True.
                  Whether to show the feature rank, feature importance and cross-validation (CV) accuracy curve.
                  To show CV accuracy curve, RFECV must be used.
+    :param kwargs: (Dictionary) - Keyword parameters of function RFE or RFECV from scikit-learn.
+                   https://scikit-learn.org/stable/modules/generated/sklearn.feature_selection.RFE.html?highlight=rfe#sklearn.feature_selection.RFE
+                   https://scikit-learn.org/stable/modules/generated/sklearn.feature_selection.RFECV.html?highlight=rfe#sklearn.feature_selection.RFECV
     :return: df_out: (Pandas.Dataframe) - Data frame with selected features and the target variable.
              df_rank: (Pandas.Dataframe) - The ranking of all features.
              df_importance: (Pandas.Dataframe) - The importance of selected features.
     """
     warnings.simplefilter('ignore')  # The warning is annoying...
-    # Set estimator.
-    if estimator_type == 'classifier':
-        estimator = RandomForestClassifier(random_state=random_state)
-    elif estimator_type == 'regressor':
-        estimator = RandomForestRegressor(random_state=random_state)
-    else:
-        raise ValueError("estimator_type can either be 'classifier' or 'regressor'.")
     # Get features and target.
     x = df[feature_col].copy()
     y = df[target_col].copy()
     # If auto is True, select the optimal number of features by RFE in cross-validation loop.
     if auto:
-        selector = RFECV(estimator, cv=5, step=1)
+        if feature_to_select is None:
+            feature_to_select = 1
+        selector = RFECV(estimator, min_features_to_select=feature_to_select, **kwargs)
     # If auto is False, select the user-defined number of features by recursive feature elimination (RFE).
     else:
-        selector = RFE(estimator, n_features_to_select=n_features_to_select, step=1)
+        selector = RFE(estimator, n_features_to_select=feature_to_select, **kwargs)
     # Fit selector with features and target.
     selector.fit(x, y)
     # Print selected features.
@@ -148,17 +146,21 @@ def feature_selection(df=None, feature_col=None, target_col=None, random_state=N
     df_out[target_col] = df[target_col].values
     # If automatically select the optimal number of features, draw a curve of cross-validation accuracy.
     if auto:
-        plt.figure(figsize=[12, 8])
+        plt.figure(figsize=[14, 8])
         plt.style.use('bmh')
-        plt.title('REFCV Result', fontsize=20)
+        plt.title('RFECV Result', fontsize=20)
         plt.xlabel('Number of feature selected', fontsize=18)
-        plt.ylabel('Cross validation score (accuracy)', fontsize=18)
-        plt.tick_params(labelsize=14)
-        plt.xticks(range(selector.n_features_in_ + 1))
-        plt.plot(range(1, selector.n_features_in_ + 1), selector.cv_results_['mean_test_score'], 'ro--', lw=2,
-                 markeredgecolor='k', ms=8)
-        plt.errorbar(range(1, selector.n_features_in_ + 1), selector.cv_results_['mean_test_score'],
-                     yerr=selector.cv_results_['std_test_score'], fmt='none', ecolor='k', capsize=5, elinewidth=1)
+        plt.ylabel('CV score', fontsize=18)
+        plt.tick_params(labelsize=17)
+        x = range(feature_to_select, selector.n_features_in_ + 1)
+        plt.xticks(x)
+        y = selector.cv_results_['mean_test_score']
+        yerr = selector.cv_results_['std_test_score']
+        plt.plot(x, y, 'ro--', lw=2, markeredgecolor='k', ms=8)
+        plt.fill_between(x, y + yerr, y - yerr, alpha=0.25)
+        line = plt.axvline(x=selector.n_features_, ls='--', c='k', lw=3,
+                           label='n_features = {}\nscore = {:0.3f}'.format(selector.n_features_, y.max()))
+        plt.legend(handles=[line], loc='best', fontsize=18)
         if show:
             plt.show()
     return df_out, df_rank, df_importance
