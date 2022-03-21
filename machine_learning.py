@@ -147,7 +147,6 @@ def feature_selection(df=None, feature_col=None, target_col=None, estimator=None
     # If automatically select the optimal number of features, draw a curve of cross-validation accuracy.
     if auto:
         plt.figure(figsize=[14, 8])
-        plt.style.use('bmh')
         plt.title('RFECV Result', fontsize=20)
         plt.xlabel('Number of feature selected', fontsize=18)
         plt.ylabel('CV score', fontsize=18)
@@ -163,6 +162,7 @@ def feature_selection(df=None, feature_col=None, target_col=None, estimator=None
         plt.legend(handles=[line], loc='best', fontsize=18)
         if show:
             plt.show()
+            plt.tight_layout()
     return df_out, df_rank, df_importance
 
 
