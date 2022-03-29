@@ -507,7 +507,7 @@ def FSDI_interhorizon(feature_file=None, feature_name=None, header_x=73, header_
         # Compute thickness between horizons.
         th = horizon[i+1][horizon_z_col].values - horizon[i][horizon_z_col].values
         # Get the maximum thickness, notice that NaN may present (use np.nanmax instead of np.amax).
-        th_max = np.nanmax(th)
+        th_max = np.nanmax(abs(th))
         if dp is None:
             per = np.linspace(0, 1, num=int(round(1/(dt/th_max))), dtype='float32')
         else:
