@@ -522,6 +522,8 @@ def FSDI_interhorizon(feature_file=None, feature_name=None, header_x=73, header_
             dist_map = scipy.spatial.distance.cdist(np.reshape(df_temp[horizon_z_col].values, (-1, 1)),
                                                     np.reshape(t, (-1, 1)), metric='minkowski', p=1)
             z_ind = np.argmin(dist_map, axis=1)  # The horizon depth indexes of every trace in feature cubes.
+            if (np.amin(dist_map, axis=1) > dt).any():  # Check outliers of horizon's z coordinates.
+                raise ValueError('Z coordinates of the horizon are out of the Z range of input cubes.')
             if np.amin(z_ind) < z_ind_min:
                 z_ind_min = np.amin(z_ind)
             if np.amax(z_ind) > z_ind_max:
