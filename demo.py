@@ -229,10 +229,8 @@ cmap = 'rainbow'
 # Set depth range to visualize.
 ylim = [2400, 2600]
 
-# Define x axis name.
-x_name = 'Porosity - %'
-plotlog(df, depth=depth, log=log, cmap=cmap, ylim=ylim, xlabel='Porosity - %', title='W584', fill_log=True)
-
+# Display well log.
+plot_log(df, depth_name=depth, log_name=log, cmap=cmap, ylim=ylim, xlabel='Porosity (%)', fill_log=True)
 
 ##
 # Demonstration of getting data from cube to well.
