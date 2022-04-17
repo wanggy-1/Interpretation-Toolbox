@@ -6,6 +6,7 @@ import scipy.spatial
 import math
 import segyio
 from prettytable import PrettyTable
+from collections import Counter
 
 
 def resample_log(df_log=None, delta=None, depth_col='depth', log_col=None, method='average', abnormal_value=None,
@@ -249,9 +250,7 @@ def cross_plot2D(df=None, x=None, y=None, c=None, cmap='rainbow',
     :param ylim: (List of floats) - Default is to infer from data. Range of y-axis, e.g. [0, 150]
     :param show: (Bool) - Default is True. Whether to show the figure.
     """
-    plt.figure(figsize=(13, 9))
-    # Set style sheet to bmh.
-    plt.style.use('bmh')
+    plt.figure(figsize=(8, 6))
     # Set up the scatter plot.
     plt.scatter(x=x, y=y, data=df, c=c, cmap=cmap)
     plt.xlabel(xlabel, fontsize=18)
@@ -262,10 +261,12 @@ def cross_plot2D(df=None, x=None, y=None, c=None, cmap='rainbow',
     if ylim is not None:
         plt.ylim(ylim[0], ylim[1])
     plt.title(title, fontsize=20)
+    plt.grid(linestyle='--')
     cbar = plt.colorbar()
     cbar.set_label(colorbar, size=18)
     cbar.ax.tick_params(labelsize=16)
     if show:
+        plt.tight_layout()
         plt.show()
 
 
@@ -317,57 +318,78 @@ def cross_plot3D(df=None, x=None, y=None, z=None, c=None, cmap='rainbow',
         plt.show()
 
 
-def plotlog(df=None, depth=None, log=None, fill_log=True, cmap='rainbow',
-            xlabel=None, ylabel='Depth - m', xlim=None, ylim=None,
-            title=None, show=True):
+def plot_log(df_log=None, depth_name=None, log_name=None, xlim=None, ylim=None, xlabel='Value', ylabel='Depth(m)',
+             title=None, fill_log=False, cmap='rainbow', colors=None, categorical=False):
     """
-    Draw well log curves.
+    Plot logging data.
     https://towardsdatascience.com/enhancing-visualization-of-well-logs-with-plot-fills-72d9dcd10c1b
-    :param df: (pandas.DataFrame) - Well log data frame.
-    :param depth: (String) - Depth column name in data frame.
-    :param log: (String) - Log column name in data frame.
-    :param fill_log: (Bool) - Default is True which is to fill the area under the log curve.
-    :param cmap: (String) - Default is 'rainbow'. Color map to fill the area under the log curve.
-    :param xlabel: (String) - X-axis name.
-    :param ylabel: (String) - Default is 'Depth - m'. Y-axis name.
-    :param xlim: (List of floats) - Default is to infer from data. Range of x-axis, e.g. [0, 150].
-    :param ylim: (List of floats) - Default is to infer from data. Range of y-axis, e.g. [0, 2000].
-    :param title: (String) - Title of the figure.
-    :param show: (Bool) - Default is True. Whether to show the figure.
+    :param df_log: (pandas.DataFrame) - The well log data frame which contains a depth column and log columns.
+    :param depth_name: (String) - The depth column name.
+    :param log_name: (String) - The log column name.
+    :param xlim: (List of floats) - Range of x-axis, e.g. [0, 150]. Default is to infer from data.
+                                    For numerical logs only.
+    :param ylim: (List of floats) - Range of y-axis, e.g. [0, 150]. Default is to infer from data.
+    :param xlabel: (String) - The label of x-axis. Default is 'Value'. For numerical logs only.
+    :param ylabel: (String) - The label of y-axis. Default is 'Depth(m)'.
+    :param title: (String) - The title of this plot.
+    :param fill_log: (Bool) - Whether to fill the area between y-axis and the log curve. Default is True.
+                              For numerical logs only.
+    :param cmap: (String) - The color map to fill the area between y-axis and the log curve. Default is 'rainbow'.
+                            For numerical logs only.
+    :param colors: (List of Strings) - Colors for different logging data classes. For categorical logs only.
+                   For example, ['red', 'green', 'blue'] for classes ['sandstone', 'shale', 'limestone'].
+    :param categorical: (Bool) - Whether the logging data is categorical. Default is False.
     """
-    # Set up the plot.
-    plt.style.use('bmh')  # PLot style.
-    plt.figure(figsize=(7, 10))
-    ax = plt.axes()
-    plt.plot(log, depth, data=df, c='black', lw=0.5)
-    if xlim is not None:
-        ax.set_xlim(xlim[0], xlim[1])
-    if ylim is None:
-        ax.set_ylim(df[depth].min(), df[depth].max())
+    # Get depth and logging data.
+    depth = df_log[depth_name].values
+    log = df_log[log_name].values
+    # Categorical logs.
+    if categorical:
+        plt.figure(figsize=[2, 8])
+        plt.xticks([])
+        plt.ylabel(ylabel, fontsize=16)
+        plt.title(title, fontsize=16, fontweight='bold')
+        plt.tick_params(axis='y', labelsize=16)
+        plt.xlim([0, 1])
+        if ylim is None:
+            plt.ylim(depth.min(), depth.max())
+        else:
+            plt.ylim(ylim[0], ylim[1])
+        ax = plt.gca()
+        ax.invert_yaxis()
+        classlabel = list(dict(sorted(Counter(log).items())).keys())
+        for i in range(len(classlabel)):
+            plt.fill_betweenx(depth, 0, (log+1) * 10, where=(log == classlabel[i]), color=colors[i], interpolate=True)
+    # Numerical logs.
     else:
-        ax.set_ylim(ylim[0], ylim[1])
-    ax.invert_yaxis()
-    ax.set_xlabel(xlabel, fontsize=14)
-    ax.set_ylabel(ylabel, fontsize=14)
-    ax.tick_params(labelsize=13)
-    ax.set_title(title, fontsize=16, fontweight='bold')
-    if fill_log:
-        # Get x axis range.
-        left_value, right_value = ax.get_xlim()
-        span = abs(left_value - right_value)
-        # Get log value.
-        curve = df[log]
-        # Assign color map.
-        cmap = plt.get_cmap(cmap)
-        # Create array of values to divide up the area under curve.
-        color_index = np.arange(left_value, right_value, span / 100)
-        # Loop through each value in the color_index.
-        for index in sorted(color_index):
-            index_value = (index - left_value) / span
-            color = cmap(index_value)  # Obtain color for color index value.
-            plt.fill_betweenx(df[depth], 0, curve, where=curve >= index, color=color)
-    if show:
-        plt.show()
+        plt.figure(figsize=(3, 10))
+        ax = plt.axes()
+        plt.plot(log, depth, c='black', lw=0.5)
+        if xlim is not None:
+            ax.set_xlim(xlim[0], xlim[1])
+        if ylim is None:
+            ax.set_ylim(depth.min(), depth.max())
+        else:
+            ax.set_ylim(ylim[0], ylim[1])
+        ax.invert_yaxis()
+        ax.set_xlabel(xlabel, fontsize=16)
+        ax.set_ylabel(ylabel, fontsize=16)
+        ax.tick_params(labelsize=16)
+        ax.set_title(title, fontsize=16, fontweight='bold')
+        if fill_log:
+            # Get x axis range.
+            left_value, right_value = ax.get_xlim()
+            span = abs(left_value - right_value)
+            # Assign color map.
+            cmap = plt.get_cmap(cmap)
+            # Create array of values to divide up the area under curve.
+            color_index = np.arange(left_value, right_value, span / 100)
+            # Loop through each value in the color_index.
+            for index in sorted(color_index):
+                index_value = (index - left_value) / span
+                color = cmap(index_value)  # Obtain color for color index value.
+                plt.fill_betweenx(depth, 0, log, where=log >= index, color=color)
+    plt.tight_layout()
 
 
 def rock_physics(df=None, vp_col=None, vs_col=None, den_col=None,
