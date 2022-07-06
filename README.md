@@ -1,2 +1,2 @@
 # Interpretation-Toolbox
-A toolbox for exploration geophysical data interpretation.
+A toolbox for seismic and well log data interpretation.
